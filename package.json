@@ -1,6 +1,6 @@
 {
   "name": "serverless-s3-ferry",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A Serverless Framework plugin that syncs local directories to Amazon S3 buckets using AWS SDK v3, with support for cache control, content types, bucket tagging, and offline development.",
   "keywords": [
     "serverless",
