@@ -15,19 +15,21 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import type {
+  AwsProviderExtended,
+  Plugin,
+  RawBucketConfig,
+  RawS3FerryConfig,
+  S3FerryOptions,
+  Serverless,
+} from '@shared';
 import {
-  type AwsProviderExtended,
   mockAwsIam,
   mockProgress,
   mockProvider,
-  type Plugin,
-  type RawBucketConfig,
-  type RawS3FerryConfig,
-  type S3FerryOptions,
-  type Serverless,
   TEST_BUCKET,
   TEST_STACK_NAME,
-} from '@shared';
+} from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

@@ -1,5 +1,5 @@
 import { CopyObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { TEST_BUCKET } from '@shared';
+import { TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { copyObjectWithMetadata } from './copy';

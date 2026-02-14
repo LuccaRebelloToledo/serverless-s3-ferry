@@ -1,12 +1,12 @@
+import type { AwsProviderExtended } from '@shared';
 import {
-  type AwsProviderExtended,
   mockAwsIam,
   mockProvider,
   TEST_ACCESS_KEY,
   TEST_ENDPOINT,
   TEST_REGION,
   TEST_SECRET_KEY,
-} from '@shared';
+} from '@shared/testing';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@core/aws/iam', () => mockAwsIam());

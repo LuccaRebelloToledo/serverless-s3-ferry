@@ -1,10 +1,10 @@
+import type { AwsProviderExtended } from '@shared';
 import {
-  type AwsProviderExtended,
   mockProvider,
   TEST_ACCESS_KEY,
   TEST_REGION,
   TEST_SECRET_KEY,
-} from '@shared';
+} from '@shared/testing';
 import { describe, expect, it } from 'vitest';
 import { getAwsOptions } from './credentials';
 

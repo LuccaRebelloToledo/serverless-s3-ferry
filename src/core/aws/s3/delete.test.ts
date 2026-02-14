@@ -3,7 +3,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { mockProgress, TEST_BUCKET } from '@shared';
+import { mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { deleteDirectory } from './delete';
