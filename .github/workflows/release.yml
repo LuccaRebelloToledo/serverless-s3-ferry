@@ -39,6 +39,7 @@ jobs:
     
     permissions:
       contents: read
+      id-token: write # Required for OIDC
 
     steps:
       - name: Checkout source code
@@ -64,6 +65,4 @@ jobs:
         run: npm test
 
       - name: Publish package to npm registry
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
+        run: npm publish --provenance
