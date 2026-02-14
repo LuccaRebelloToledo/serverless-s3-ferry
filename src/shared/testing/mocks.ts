@@ -1,12 +1,11 @@
+import type { AwsProviderExtended, Plugin } from '@shared';
+import { vi } from 'vitest';
 import {
-  type AwsProviderExtended,
-  type Plugin,
   TEST_ACCESS_KEY,
   TEST_REGION,
   TEST_SECRET_KEY,
   TEST_STACK_NAME,
-} from '@shared';
-import { vi } from 'vitest';
+} from './constants';
 
 type MockProvider = Pick<AwsProviderExtended, 'cachedCredentials'> & {
   getRegion: () => string;

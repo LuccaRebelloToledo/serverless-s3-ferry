@@ -2,14 +2,13 @@ import {
   CloudFormationClient,
   DescribeStacksCommand,
 } from '@aws-sdk/client-cloudformation';
+import { type AwsProviderExtended, StackOutputError } from '@shared';
 import {
-  type AwsProviderExtended,
   mockAwsIam,
   mockProvider,
-  StackOutputError,
   TEST_BUCKET,
   TEST_STACK_NAME,
-} from '@shared';
+} from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

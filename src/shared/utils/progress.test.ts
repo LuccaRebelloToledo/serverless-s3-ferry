@@ -1,4 +1,5 @@
-import { createProgressTracker, mockProgress } from '@shared';
+import { createProgressTracker } from '@shared';
+import { mockProgress } from '@shared/testing';
 import { describe, expect, it } from 'vitest';
 
 describe('createProgressTracker', () => {
