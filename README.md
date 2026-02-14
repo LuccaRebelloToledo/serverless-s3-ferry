@@ -7,6 +7,15 @@
 
 A Serverless Framework plugin that syncs local directories to Amazon S3 buckets using AWS SDK v3. ⚡
 
+## Background
+
+This plugin was independently developed to provide S3 sync
+capabilities for the Serverless Framework after the original
+[`serverless-s3-sync`](https://github.com/k1LoW/serverless-s3-sync)
+project was archived and is no longer maintained.
+
+This implementation does not reuse any code from the original project.
+
 ## Features
 
 - Sync local directories to S3 buckets on deploy and remove
