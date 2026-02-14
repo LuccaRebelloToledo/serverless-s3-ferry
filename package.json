@@ -1,6 +1,7 @@
 {
   "name": "serverless-s3-ferry",
-  "description": "A plugin to ferry local directories and S3 prefixes for Serverless Framework.",
+  "version": "0.0.1",
+  "description": "A Serverless Framework plugin that syncs local directories to Amazon S3 buckets using AWS SDK v3, with support for cache control, content types, bucket tagging, and offline development.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -8,7 +9,6 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npx @biomejs/biome check --write ./src",
@@ -16,10 +16,17 @@
   },
   "keywords": [
     "serverless",
+    "serverless-framework",
+    "serverless-plugin",
     "s3",
-    "aws-sdk-v3",
+    "s3-sync",
     "aws",
-    "ferry"
+    "aws-sdk-v3",
+    "sync",
+    "upload",
+    "deploy",
+    "static-site",
+    "spa"
   ],
   "author": "LuccaRebelloToledo <luccarebtoledo@gmail.com> (https://github.com/LuccaRebelloToledo) (based on original work by k1LoW <k1lowxb@gmail.com>)",
   "repository": {

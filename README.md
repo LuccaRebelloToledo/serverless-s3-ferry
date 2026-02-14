@@ -1,34 +1,64 @@
-> A plugin to sync local directories and S3 prefixes for Serverless Framework :zap: .
+# serverless-s3-ferry
 
-## Use Case
+[![npm version](https://img.shields.io/npm/v/serverless-s3-ferry)](https://www.npmjs.com/package/serverless-s3-ferry)
+[![license](https://img.shields.io/npm/l/serverless-s3-ferry)](LICENSE)
+[![node](https://img.shields.io/node/v/serverless-s3-ferry)](package.json)
+[![CI](https://github.com/LuccaRebelloToledo/serverless-s3-ferry/actions/workflows/ci.yml/badge.svg)](https://github.com/LuccaRebelloToledo/serverless-s3-ferry/actions/workflows/ci.yml)
 
-- Static Website ( `serverless-s3-ferry` ) & Contact form backend ( `serverless` ) .
-- SPA ( `serverless` ) & assets ( `serverless-s3-ferry` ) .
+A Serverless Framework plugin that syncs local directories to Amazon S3 buckets using AWS SDK v3. ⚡
 
-## Install
+## Background
 
-Run `npm install` in your Serverless project.
+This plugin was independently developed to provide S3 sync
+capabilities for the Serverless Framework after the original
+[`serverless-s3-sync`](https://github.com/k1LoW/serverless-s3-sync)
+project was archived and is no longer maintained.
+
+This implementation does not reuse any code from the original project.
+
+## Features
+
+- Sync local directories to S3 buckets on deploy and remove
+- Per-file cache control and content type configuration via glob patterns
+- Bucket tagging support (appends to existing tags)
+- Resolve bucket names from CloudFormation stack outputs
+- Conditional sync rules with the `enabled` flag
+- Offline development support with `serverless-offline` and `serverless-s3-local`
+- Custom lifecycle hook integration
+- Concurrent uploads with configurable parallelism
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Compatibility](#compatibility)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Offline Usage](#offline-usage)
+- [Advanced Configuration](#advanced-configuration)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+
+## Installation
 
 ```sh
-$ npm install --save serverless-s3-ferry
+npm install --save serverless-s3-ferry
 ```
 
-Add the plugin to your serverless.yml file
+Add the plugin to your `serverless.yml`:
 
 ```yaml
 plugins:
   - serverless-s3-ferry
 ```
 
-### Compatibility with Serverless Framework
+## Compatibility
 
-Version 2.0.0 is compatible with Serverless Framework v3, but it uses the legacy logging interface. Version 3.0.0 and later uses the [new logging interface](https://www.serverless.com/framework/docs/guides/plugins/cli-output).
+| serverless-s3-ferry | Serverless Framework |
+| ------------------- | -------------------- |
+| >= v1.0.0           | v4.x                 |
 
-|serverless-s3-ferry|Serverless Framework|
-|---|---|
-|≥ v4.0.0|v4.x|
-
-## Setup
+## Configuration
 
 ```yaml
 custom:
@@ -91,21 +121,21 @@ resources:
 
 ## Usage
 
-Run `sls deploy`, local directories and S3 prefixes are synced.
+Run `sls deploy` -- local directories are synced to their configured S3 prefixes.
 
-Run `sls remove`, S3 objects in S3 prefixes are removed.
+Run `sls remove` -- S3 objects in the configured prefixes are removed.
 
-Run `sls deploy --nos3ferry`, deploy your serverless stack without syncing local directories and S3 prefixes.
+Run `sls deploy --nos3ferry` -- deploy without syncing.
 
-Run `sls remove --nos3ferry`, remove your serverless stack without removing S3 objects from the target S3 buckets.
+Run `sls remove --nos3ferry` -- remove the stack without deleting S3 objects.
 
 ### `sls s3ferry`
 
-Sync local directories and S3 prefixes.
+Sync local directories and S3 prefixes on demand.
 
-### Offline usage
+## Offline Usage
 
-If also using the plugins `serverless-offline` and `serverless-s3-local`, sync can be supported during development by placing the bucket configuration(s) into the `buckets` object and specifying the alterate `endpoint` (see below).
+If you also use `serverless-offline` and `serverless-s3-local`, sync can be supported during development by placing the bucket configuration into the `buckets` object and specifying an alternate `endpoint`:
 
 ```yaml
 custom:
@@ -120,13 +150,15 @@ custom:
 # ...
 ```
 
-As per [serverless-s3-local's instructions](https://github.com/ar90n/serverless-s3-local#triggering-aws-events-offline), once a local credentials profile is configured, run `sls offline start --aws-profile s3local` to sync to the local s3 bucket instead of Amazon AWS S3
+As per [serverless-s3-local's instructions](https://github.com/ar90n/serverless-s3-local#triggering-aws-events-offline), once a local credentials profile is configured, run `sls offline start --aws-profile s3local` to sync to the local S3 bucket instead of Amazon S3.
 
-> `bucketNameKey` will not work in offline mode and can only be used in conjunction with valid AWS credentials, use `bucketName` instead.
+> `bucketNameKey` will not work in offline mode and can only be used in conjunction with valid AWS credentials. Use `bucketName` instead.
 
-run `sls deploy` for normal deployment
+Run `sls deploy` for normal deployment.
 
-### Always disable auto sync
+## Advanced Configuration
+
+### Disable auto sync
 
 ```yaml
 custom:
@@ -142,6 +174,7 @@ custom:
 ```
 
 ### Sync on other hooks
+
 ```yaml
 custom:
   s3Ferry:
@@ -155,3 +188,15 @@ custom:
       localDir: dist/assets # required
 # ...
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE)
