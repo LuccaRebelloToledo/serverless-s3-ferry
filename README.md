@@ -1,9 +1,10 @@
 # serverless-s3-ferry
 
 [![npm version](https://img.shields.io/npm/v/serverless-s3-ferry)](https://www.npmjs.com/package/serverless-s3-ferry)
-[![license](https://img.shields.io/npm/l/serverless-s3-ferry)](LICENSE)
-[![node](https://img.shields.io/node/v/serverless-s3-ferry)](package.json)
-[![CI](https://github.com/LuccaRebelloToledo/serverless-s3-ferry/actions/workflows/ci.yml/badge.svg)](https://github.com/LuccaRebelloToledo/serverless-s3-ferry/actions/workflows/ci.yml)
+![CI](https://github.com/LuccaRebelloToledo/serverless-s3-ferry/actions/workflows/ci.yml/badge.svg)
+![CodeQL](https://github.com/LuccaRebelloToledo/serverless-s3-ferry/actions/workflows/codeql.yml/badge.svg)
+[![codecov](https://codecov.io/gh/LuccaRebelloToledo/serverless-s3-ferry/branch/main/graph/badge.svg)](https://codecov.io/gh/LuccaRebelloToledo/serverless-s3-ferry)
+![license](https://img.shields.io/github/license/LuccaRebelloToledo/serverless-s3-ferry)
 
 A Serverless Framework plugin that syncs local directories to Amazon S3 buckets using AWS SDK v3. ⚡
 
