@@ -19,7 +19,7 @@
   "author": "LuccaRebelloToledo <luccarebtoledo@gmail.com> (https://github.com/LuccaRebelloToledo) (based on original work by k1LoW <k1lowxb@gmail.com>)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LuccaRebelloToledo/serverless-s3-ferry"
+    "url": "git+https://github.com/LuccaRebelloToledo/serverless-s3-ferry.git"
   },
   "homepage": "https://github.com/LuccaRebelloToledo/serverless-s3-ferry#readme",
   "bugs": {
