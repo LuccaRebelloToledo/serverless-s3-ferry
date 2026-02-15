@@ -1,9 +1,10 @@
+import { DeleteObjectsCommand, type S3Client } from '@aws-sdk/client-s3';
 import {
-  DeleteObjectsCommand,
-  ListObjectsV2Command,
-  type S3Client,
-} from '@aws-sdk/client-s3';
-import { createProgressTracker, type Plugin } from '@shared';
+  createProgressTracker,
+  type Plugin,
+  S3_DELETE_BATCH_SIZE,
+} from '@shared';
+import { listAllObjects } from './list';
 
 export interface DeleteDirOptions {
   s3Client: S3Client;
@@ -12,36 +13,36 @@ export interface DeleteDirOptions {
   progress: Plugin.Progress;
 }
 
+export async function deleteObjectsByKeys(
+  s3Client: S3Client,
+  bucket: string,
+  keys: string[],
+  onBatch?: (deletedSoFar: number, total: number) => void,
+): Promise<void> {
+  let deleted = 0;
+  for (let i = 0; i < keys.length; i += S3_DELETE_BATCH_SIZE) {
+    const batch = keys.slice(i, i + S3_DELETE_BATCH_SIZE);
+    await s3Client.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: {
+          Objects: batch.map((Key) => ({ Key })),
+          Quiet: true,
+        },
+      }),
+    );
+    deleted += batch.length;
+    onBatch?.(deleted, keys.length);
+  }
+}
+
 export async function deleteDirectory(
   options: DeleteDirOptions,
 ): Promise<void> {
   const { s3Client, bucket, prefix, progress } = options;
 
-  const allKeys: string[] = [];
-  let continuationToken: string | undefined;
-
-  // List all objects with the given prefix
-  do {
-    const response = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
-      }),
-    );
-
-    if (response.Contents) {
-      for (const obj of response.Contents) {
-        if (obj.Key) {
-          allKeys.push(obj.Key);
-        }
-      }
-    }
-
-    continuationToken = response.IsTruncated
-      ? response.NextContinuationToken
-      : undefined;
-  } while (continuationToken);
+  const objects = await listAllObjects(s3Client, bucket, prefix);
+  const allKeys = objects.map((obj) => obj.Key);
 
   if (allKeys.length === 0) {
     return;
@@ -53,20 +54,7 @@ export async function deleteDirectory(
       `${bucket}: removing files with prefix ${prefix} (${percent}%)`,
   );
 
-  // Delete in batches of 1000 (S3 limit)
-  let deleted = 0;
-  for (let i = 0; i < allKeys.length; i += 1000) {
-    const batch = allKeys.slice(i, i + 1000);
-    await s3Client.send(
-      new DeleteObjectsCommand({
-        Bucket: bucket,
-        Delete: {
-          Objects: batch.map((Key) => ({ Key })),
-          Quiet: true,
-        },
-      }),
-    );
-    deleted += batch.length;
-    tracker.update(deleted, allKeys.length);
-  }
+  await deleteObjectsByKeys(s3Client, bucket, allKeys, (deletedSoFar, total) =>
+    tracker.update(deletedSoFar, total),
+  );
 }

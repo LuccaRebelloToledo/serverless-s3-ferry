@@ -1,11 +1,12 @@
 import child_process from 'node:child_process';
 import path from 'node:path';
 import { env } from 'node:process';
+import type { S3Client } from '@aws-sdk/client-s3';
 import { resolveStackOutput } from '@core/aws/cloudformation';
 import {
-  copyObjectWithMetadata,
   createS3Client,
   deleteDirectory,
+  syncDirectoryMetadata,
   updateBucketTags,
   uploadDirectory,
 } from '@core/aws/s3';
@@ -14,13 +15,10 @@ import {
   type BucketSyncConfig,
   buildParamMatchers,
   ConfigValidationError,
-  encodeSpecialCharacters,
-  extractMetaParams,
-  type FileToSync,
+  DEFAULT_MAX_CONCURRENCY,
   getBucketConfigs,
   getCustomHooks,
   getEndpoint,
-  getLocalFiles,
   getNoSync,
   type Plugin,
   parseBucketConfig,
@@ -29,11 +27,7 @@ import {
   type S3FerryOptions,
   type Serverless,
   type Tag,
-  toS3Path,
 } from '@shared';
-import mime from 'mime';
-import { minimatch } from 'minimatch';
-import pLimit from 'p-limit';
 
 class ServerlessS3Ferry implements Plugin {
   private readonly serverless: Serverless;
@@ -42,6 +36,7 @@ class ServerlessS3Ferry implements Plugin {
   private readonly progress: Plugin.Logging['progress'];
   private readonly servicePath: string;
   private offline: boolean;
+  private _s3Client: S3Client | null = null;
 
   public commands: Plugin.Commands;
   public hooks: Plugin.Hooks;
@@ -119,9 +114,7 @@ class ServerlessS3Ferry implements Plugin {
     const customHookEntries = customHooks.reduce(
       (acc: Record<string, () => Promise<void>>, hook: string) => {
         acc[hook] = async () => {
-          await this.sync();
-          await this.syncMetadata();
-          await this.syncBucketTags();
+          await this.performFullSync();
         };
         return acc;
       },
@@ -131,21 +124,15 @@ class ServerlessS3Ferry implements Plugin {
     this.hooks = {
       'after:deploy:deploy': async () => {
         if (noSync) return;
-        await this.sync();
-        await this.syncMetadata();
-        await this.syncBucketTags();
+        await this.performFullSync();
       },
       'after:offline:start:init': async () => {
         if (noSync) return;
-        await this.sync();
-        await this.syncMetadata();
-        await this.syncBucketTags();
+        await this.performFullSync();
       },
       'after:offline:start': async () => {
         if (noSync) return;
-        await this.sync();
-        await this.syncMetadata();
-        await this.syncBucketTags();
+        await this.performFullSync();
       },
       'before:offline:start': async () => {
         this.setOffline();
@@ -179,8 +166,15 @@ class ServerlessS3Ferry implements Plugin {
     };
   }
 
+  private async performFullSync(): Promise<void> {
+    await this.sync();
+    await this.syncMetadata();
+    await this.syncBucketTags();
+  }
+
   private setOffline(): void {
     this.offline = true;
+    this._s3Client = null;
   }
 
   private isOffline(): boolean {
@@ -202,13 +196,16 @@ class ServerlessS3Ferry implements Plugin {
   }
 
   private getS3Client() {
-    const endpoint = getEndpoint(this.getS3FerryConfig());
-    const provider = this.getProvider();
-    return createS3Client({
-      provider,
-      endpoint,
-      offline: this.isOffline(),
-    });
+    if (!this._s3Client) {
+      const endpoint = getEndpoint(this.getS3FerryConfig());
+      const provider = this.getProvider();
+      this._s3Client = createS3Client({
+        provider,
+        endpoint,
+        offline: this.isOffline(),
+      });
+    }
+    return this._s3Client;
   }
 
   private async getBucketName(
@@ -264,7 +261,10 @@ class ServerlessS3Ferry implements Plugin {
         try {
           if (config.preCommand) {
             bucketProgress.update(`${localDir}: running pre-command...`);
-            child_process.execSync(config.preCommand, { stdio: 'inherit' });
+            child_process.execSync(config.preCommand, {
+              stdio: 'inherit',
+              timeout: 120_000,
+            });
           }
 
           const paramMatchers = buildParamMatchers(config.params);
@@ -278,7 +278,7 @@ class ServerlessS3Ferry implements Plugin {
             deleteRemoved: config.deleteRemoved,
             defaultContentType: config.defaultContentType,
             params: paramMatchers,
-            maxConcurrency: 5,
+            maxConcurrency: DEFAULT_MAX_CONCURRENCY,
             progress: bucketProgress,
             servicePath: this.servicePath,
             env: this.options.env,
@@ -361,102 +361,32 @@ class ServerlessS3Ferry implements Plugin {
       const promises = rawBuckets.map(async (raw) => {
         const config = parseBucketConfig(raw);
 
-        let bucketPrefix = '';
-        if (config.bucketPrefix.length > 0) {
-          bucketPrefix = config.bucketPrefix
-            .replace(/\/?$/, '')
-            .replace(/^\/?/, '/');
-        }
-
-        const localDir = path.join(this.servicePath, config.localDir);
-        let filesToSync: FileToSync[] = [];
-        const ignoreFiles: string[] = ['.DS_Store'];
-
-        if (config.params.length > 0) {
-          for (const param of config.params) {
-            const glob = Object.keys(param)[0];
-            const files = getLocalFiles(localDir, this.log);
-            const matches = minimatch.match(
-              files,
-              `${path.resolve(localDir)}${path.sep}${glob}`,
-              { matchBase: true },
-            );
-
-            for (const match of matches) {
-              const params = extractMetaParams(param);
-              if (ignoreFiles.includes(match)) continue;
-              if (params.OnlyForEnv && params.OnlyForEnv !== this.options.env) {
-                ignoreFiles.push(match);
-                filesToSync = filesToSync.filter((e) => e.name !== match);
-                continue;
-              }
-              delete params.OnlyForEnv;
-              filesToSync = filesToSync.filter((e) => e.name !== match);
-              filesToSync.push({ name: match, params });
-            }
-          }
-        }
+        if (config.params.length === 0) return;
 
         const bucketName = await this.getBucketName(config);
         if (this.options?.bucket && bucketName !== this.options.bucket) {
           return;
         }
 
-        const bucketDir = `${bucketName}${bucketPrefix === '' ? '' : bucketPrefix}/`;
+        const localDir = path.join(this.servicePath, config.localDir);
 
         const bucketProgress = this.progress.create({
-          message: `${localDir}: sync bucket metadata to ${bucketDir} (0%)`,
+          message: `${localDir}: sync bucket metadata to ${bucketName} (0%)`,
         });
 
         try {
-          const s3Client = this.getS3Client();
-
-          const limit = pLimit(5);
-          await Promise.all(
-            filesToSync.map((file) =>
-              limit(async () => {
-                let contentType: string | undefined;
-                const detectedContentType = mime.getType(file.name);
-                if (detectedContentType !== null || config.defaultContentType) {
-                  contentType =
-                    detectedContentType ?? config.defaultContentType;
-                }
-
-                const copySource = encodeSpecialCharacters(
-                  toS3Path(
-                    file.name.replace(
-                      path.resolve(localDir) + path.sep,
-                      bucketDir,
-                    ),
-                  ),
-                );
-
-                const key = encodeSpecialCharacters(
-                  toS3Path(
-                    file.name.replace(
-                      path.resolve(localDir) + path.sep,
-                      bucketPrefix ? `${bucketPrefix.replace(/^\//, '')}/` : '',
-                    ),
-                  ),
-                );
-
-                await copyObjectWithMetadata({
-                  s3Client,
-                  bucket: bucketName,
-                  copySource,
-                  key,
-                  acl: config.acl,
-                  contentType,
-                  extraParams: file.params,
-                });
-              }),
-            ),
-          );
-
-          const percent = filesToSync.length > 0 ? 100 : 0;
-          bucketProgress.update(
-            `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
-          );
+          await syncDirectoryMetadata({
+            s3Client: this.getS3Client(),
+            localDir,
+            bucket: bucketName,
+            bucketPrefix: config.bucketPrefix,
+            acl: config.acl,
+            defaultContentType: config.defaultContentType,
+            params: config.params,
+            env: this.options.env,
+            progress: bucketProgress,
+            log: this.log,
+          });
         } finally {
           bucketProgress.remove();
         }

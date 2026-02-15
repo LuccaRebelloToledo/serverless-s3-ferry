@@ -294,6 +294,7 @@ describe('ServerlessS3Ferry', () => {
 
         expect(execSyncSpy).toHaveBeenCalledWith('echo test', {
           stdio: 'inherit',
+          timeout: 120_000,
         });
       } finally {
         execSyncSpy.mockRestore();

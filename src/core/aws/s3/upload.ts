@@ -2,16 +2,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  DeleteObjectsCommand,
-  ListObjectsV2Command,
   PutObjectCommand,
   type PutObjectCommandInput,
   type S3Client,
 } from '@aws-sdk/client-s3';
 import {
   createProgressTracker,
+  DEFAULT_MAX_CONCURRENCY,
   type ErrorLogger,
-  type FileUploadEntry,
   getLocalFiles,
   type ParamMatcher,
   type Plugin,
@@ -23,6 +21,8 @@ import {
 import mime from 'mime';
 import { minimatch } from 'minimatch';
 import pLimit from 'p-limit';
+import { deleteObjectsByKeys } from './delete';
+import { listAllObjects } from './list';
 
 export interface UploadDirectoryOptions extends UploadDirOptions {
   s3Client: S3Client;
@@ -32,45 +32,13 @@ export interface UploadDirectoryOptions extends UploadDirOptions {
   log?: ErrorLogger;
 }
 
-async function listAllObjects(
-  s3Client: S3Client,
-  bucket: string,
-  prefix: string,
-): Promise<S3Object[]> {
-  const objects: S3Object[] = [];
-  let continuationToken: string | undefined;
-
-  do {
-    const response = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
-      }),
-    );
-
-    if (response.Contents) {
-      for (const obj of response.Contents) {
-        if (obj.Key) {
-          objects.push({
-            Key: obj.Key,
-            ETag: obj.ETag,
-            Size: obj.Size,
-          });
-        }
-      }
-    }
-
-    continuationToken = response.IsTruncated
-      ? response.NextContinuationToken
-      : undefined;
-  } while (continuationToken);
-
-  return objects;
+interface FileProcessEntry {
+  localPath: string;
+  s3Key: string;
+  s3Params: S3Params;
 }
 
-function computeMD5(filePath: string): string {
-  const content = fs.readFileSync(filePath);
+function computeMD5(content: Buffer): string {
   return `"${crypto.createHash('md5').update(content).digest('hex')}"`;
 }
 
@@ -115,7 +83,7 @@ export async function uploadDirectory(
     deleteRemoved,
     defaultContentType,
     params,
-    maxConcurrency = 5,
+    maxConcurrency = DEFAULT_MAX_CONCURRENCY,
     progress,
     env,
     log,
@@ -130,8 +98,8 @@ export async function uploadDirectory(
     remoteByKey.set(obj.Key, obj);
   }
 
-  // Determine which files need uploading
-  const filesToUpload: FileUploadEntry[] = [];
+  // Build list of candidate files and track local keys (without reading file content)
+  const filesToProcess: FileProcessEntry[] = [];
   const localKeys = new Set<string>();
 
   for (const localFile of localFiles) {
@@ -148,23 +116,13 @@ export async function uploadDirectory(
       continue;
     }
 
-    // Check if file has changed by comparing MD5 with ETag
-    const remote = remoteByKey.get(s3Key);
-    if (remote?.ETag) {
-      const localMD5 = computeMD5(localFile);
-      if (localMD5 === remote.ETag) {
-        continue; // file unchanged
-      }
-    }
-
-    filesToUpload.push({ localPath: localFile, s3Key, s3Params });
+    filesToProcess.push({ localPath: localFile, s3Key, s3Params });
   }
 
   // Determine files to delete (exist remotely but not locally)
   const keysToDelete: string[] = [];
   if (deleteRemoved) {
     for (const remoteKey of remoteByKey.keys()) {
-      // Only consider keys under our prefix
       if (!localKeys.has(remoteKey)) {
         keysToDelete.push(remoteKey);
       }
@@ -172,7 +130,7 @@ export async function uploadDirectory(
   }
 
   const totalOperations =
-    filesToUpload.length + (keysToDelete.length > 0 ? 1 : 0);
+    filesToProcess.length + (keysToDelete.length > 0 ? 1 : 0);
   let completedOperations = 0;
 
   const tracker = createProgressTracker(
@@ -180,25 +138,35 @@ export async function uploadDirectory(
     (percent) => `${localDir}: sync with bucket ${bucket} (${percent}%)`,
   );
 
-  // Upload new/changed files
+  // Read, compare MD5, and upload in a single pass per file (inside pLimit)
+  // Only maxConcurrency file buffers are in memory at any given time
   const limit = pLimit(maxConcurrency);
   await Promise.all(
-    filesToUpload.map((file) =>
+    filesToProcess.map((entry) =>
       limit(async () => {
+        const buffer = await fs.promises.readFile(entry.localPath);
+        const localMD5 = computeMD5(buffer);
+
+        // Check if file has changed by comparing MD5 with ETag
+        const remote = remoteByKey.get(entry.s3Key);
+        if (remote?.ETag && localMD5 === remote.ETag) {
+          completedOperations++;
+          tracker.update(completedOperations, totalOperations);
+          return; // file unchanged
+        }
+
         const contentType =
-          mime.getType(file.localPath) ??
+          mime.getType(entry.localPath) ??
           defaultContentType ??
           'application/octet-stream';
 
-        const body = fs.readFileSync(file.localPath);
-
         const putParams: PutObjectCommandInput = {
           Bucket: bucket,
-          Key: file.s3Key,
-          Body: body,
+          Key: entry.s3Key,
+          Body: buffer,
           ACL: acl,
           ContentType: contentType,
-          ...file.s3Params,
+          ...entry.s3Params,
         };
 
         await s3Client.send(new PutObjectCommand(putParams));
@@ -211,18 +179,7 @@ export async function uploadDirectory(
 
   // Delete removed files
   if (keysToDelete.length > 0) {
-    for (let i = 0; i < keysToDelete.length; i += 1000) {
-      const batch = keysToDelete.slice(i, i + 1000);
-      await s3Client.send(
-        new DeleteObjectsCommand({
-          Bucket: bucket,
-          Delete: {
-            Objects: batch.map((Key) => ({ Key })),
-            Quiet: true,
-          },
-        }),
-      );
-    }
+    await deleteObjectsByKeys(s3Client, bucket, keysToDelete);
     completedOperations++;
     tracker.update(completedOperations, totalOperations);
   }
