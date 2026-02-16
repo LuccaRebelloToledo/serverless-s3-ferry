@@ -29,6 +29,7 @@ describe('copyObjectWithMetadata', () => {
     });
 
     const call = s3Mock.commandCalls(CopyObjectCommand)[0];
+    if (!call) throw new Error('Expected CopyObjectCommand call');
     expect(call.args[0].input.MetadataDirective).toBe('REPLACE');
     expect(call.args[0].input.Bucket).toBe(TEST_BUCKET);
     expect(call.args[0].input.Key).toBe('key.txt');
@@ -51,6 +52,7 @@ describe('copyObjectWithMetadata', () => {
     });
 
     const call = s3Mock.commandCalls(CopyObjectCommand)[0];
+    if (!call) throw new Error('Expected CopyObjectCommand call');
     expect(call.args[0].input.ContentType).toBe('text/html');
   });
 
@@ -68,6 +70,7 @@ describe('copyObjectWithMetadata', () => {
     });
 
     const call = s3Mock.commandCalls(CopyObjectCommand)[0];
+    if (!call) throw new Error('Expected CopyObjectCommand call');
     expect(call.args[0].input.CacheControl).toBe('max-age=300');
   });
 });

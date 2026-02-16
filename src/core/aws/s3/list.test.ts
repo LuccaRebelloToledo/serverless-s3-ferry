@@ -29,12 +29,15 @@ describe('listAllObjects', () => {
       const result = await listAllObjects(client, TEST_BUCKET, '');
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
+      const first = result[0];
+      const second = result[1];
+      if (!first || !second) throw new Error('Expected two results');
+      expect(first).toEqual({
         Key: 'file1.txt',
         ETag: '"abc123"',
         Size: 100,
       });
-      expect(result[1]).toEqual({
+      expect(second).toEqual({
         Key: 'file2.txt',
         ETag: '"def456"',
         Size: 200,
@@ -51,10 +54,14 @@ describe('listAllObjects', () => {
       const result = await listAllObjects(client, TEST_BUCKET, 'assets/');
 
       expect(result).toHaveLength(1);
-      expect(result[0].Key).toBe('assets/style.css');
+      const first = result[0];
+      if (!first) throw new Error('Expected result');
+      expect(first.Key).toBe('assets/style.css');
 
       const calls = s3Mock.commandCalls(ListObjectsV2Command);
-      expect(calls[0].args[0].input.Prefix).toBe('assets/');
+      const call = calls[0];
+      if (!call) throw new Error('Expected ListObjectsV2Command call');
+      expect(call.args[0].input.Prefix).toBe('assets/');
     });
   });
 
@@ -76,8 +83,11 @@ describe('listAllObjects', () => {
       const result = await listAllObjects(client, TEST_BUCKET, '');
 
       expect(result).toHaveLength(2);
-      expect(result[0].Key).toBe('page1.txt');
-      expect(result[1].Key).toBe('page2.txt');
+      const first = result[0];
+      const second = result[1];
+      if (!first || !second) throw new Error('Expected two results');
+      expect(first.Key).toBe('page1.txt');
+      expect(second.Key).toBe('page2.txt');
     });
 
     it('handles three+ page pagination with multiple tokens', async () => {
@@ -127,8 +137,12 @@ describe('listAllObjects', () => {
 
       const calls = s3Mock.commandCalls(ListObjectsV2Command);
       expect(calls).toHaveLength(2);
-      expect(calls[0].args[0].input.ContinuationToken).toBeUndefined();
-      expect(calls[1].args[0].input.ContinuationToken).toBe('token-xyz');
+      const call0 = calls[0];
+      const call1 = calls[1];
+      if (!call0 || !call1)
+        throw new Error('Expected ListObjectsV2Command calls');
+      expect(call0.args[0].input.ContinuationToken).toBeUndefined();
+      expect(call1.args[0].input.ContinuationToken).toBe('token-xyz');
     });
 
     it('handles large result sets with 1000+ objects per page', async () => {
@@ -154,8 +168,11 @@ describe('listAllObjects', () => {
       const result = await listAllObjects(client, TEST_BUCKET, '');
 
       expect(result).toHaveLength(1001);
-      expect(result[0].Key).toBe('file-0.txt');
-      expect(result[1000].Key).toBe('file-1000.txt');
+      const first = result[0];
+      const last = result[1000];
+      if (!first || !last) throw new Error('Expected results');
+      expect(first.Key).toBe('file-0.txt');
+      expect(last.Key).toBe('file-1000.txt');
     });
   });
 
@@ -196,7 +213,9 @@ describe('listAllObjects', () => {
       const result = await listAllObjects(client, TEST_BUCKET, '');
 
       expect(result).toHaveLength(1);
-      expect(result[0].Key).toBe('valid.txt');
+      const first = result[0];
+      if (!first) throw new Error('Expected result');
+      expect(first.Key).toBe('valid.txt');
     });
 
     it('handles empty prefix', async () => {
@@ -214,7 +233,9 @@ describe('listAllObjects', () => {
       expect(result).toHaveLength(2);
 
       const calls = s3Mock.commandCalls(ListObjectsV2Command);
-      expect(calls[0].args[0].input.Prefix).toBe('');
+      const call = calls[0];
+      if (!call) throw new Error('Expected ListObjectsV2Command call');
+      expect(call.args[0].input.Prefix).toBe('');
     });
 
     it('preserves undefined ETag and Size fields', async () => {
@@ -230,17 +251,21 @@ describe('listAllObjects', () => {
       const client = new S3Client({});
       const result = await listAllObjects(client, TEST_BUCKET, '');
 
-      expect(result[0]).toEqual({
+      const r0 = result[0];
+      const r1 = result[1];
+      const r2 = result[2];
+      if (!r0 || !r1 || !r2) throw new Error('Expected three results');
+      expect(r0).toEqual({
         Key: 'file1.txt',
         ETag: undefined,
         Size: undefined,
       });
-      expect(result[1]).toEqual({
+      expect(r1).toEqual({
         Key: 'file2.txt',
         ETag: '"aaa"',
         Size: undefined,
       });
-      expect(result[2]).toEqual({
+      expect(r2).toEqual({
         Key: 'file3.txt',
         ETag: undefined,
         Size: 100,

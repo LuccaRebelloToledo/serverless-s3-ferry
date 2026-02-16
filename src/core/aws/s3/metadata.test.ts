@@ -41,8 +41,10 @@ describe('syncDirectoryMetadata', () => {
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
       expect(calls).toHaveLength(1);
-      expect(calls[0].args[0].input.Key).toBe('index.html');
-      expect(calls[0].args[0].input.CacheControl).toBe('max-age=3600');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Key).toBe('index.html');
+      expect(call.args[0].input.CacheControl).toBe('max-age=3600');
     });
 
     it('matches files with directory patterns', async () => {
@@ -93,7 +95,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.CacheControl).toBe('max-age=600');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.CacheControl).toBe('max-age=600');
     });
 
     it('handles pattern priority with later patterns overriding earlier ones', async () => {
@@ -116,8 +120,10 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
       // Later pattern completely replaces earlier one
-      expect(calls[0].args[0].input.CacheControl).toBe('max-age=200');
+      expect(call.args[0].input.CacheControl).toBe('max-age=200');
     });
   });
 
@@ -169,7 +175,9 @@ describe('syncDirectoryMetadata', () => {
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
       expect(calls).toHaveLength(1);
-      expect(calls[0].args[0].input.Key).toBe('prod.js');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Key).toBe('prod.js');
     });
 
     it('handles undefined environment', async () => {
@@ -217,7 +225,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.CacheControl).toBe('max-age=300');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.CacheControl).toBe('max-age=300');
     });
 
     it('skips file excluded by OnlyForEnv in first pattern but matches later pattern', async () => {
@@ -265,7 +275,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.ContentType).toBe('text/html');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.ContentType).toBe('text/html');
     });
 
     it('uses default content type for unknown extensions', async () => {
@@ -286,9 +298,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.ContentType).toBe(
-        'application/octet-stream',
-      );
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.ContentType).toBe('application/octet-stream');
     });
 
     it('handles undefined content type when no detection and no default', async () => {
@@ -308,7 +320,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.ContentType).toBeUndefined();
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.ContentType).toBeUndefined();
     });
   });
 
@@ -353,7 +367,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.Key).toBe('static/file.txt');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Key).toBe('static/file.txt');
     });
 
     it('normalizes bucket prefix with leading slash', async () => {
@@ -373,7 +389,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      expect(calls[0].args[0].input.Key).toBe('static/file.txt');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Key).toBe('static/file.txt');
     });
 
     it('constructs copySource paths correctly', async () => {
@@ -393,7 +411,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      const copySource = calls[0].args[0].input.CopySource;
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      const copySource = call.args[0].input.CopySource;
       expect(copySource).toContain(TEST_BUCKET);
       expect(copySource).toContain('file.txt');
     });
@@ -415,7 +435,9 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      const key = calls[0].args[0].input.Key;
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      const key = call.args[0].input.Key;
       expect(key).toContain('%20');
     });
   });
@@ -441,8 +463,10 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
       // Later pattern (index.html) replaces earlier pattern (*.html)
-      expect(calls[0].args[0].input.CacheControl).toBe('max-age=7200');
+      expect(call.args[0].input.CacheControl).toBe('max-age=7200');
     });
 
     it('handles empty params', async () => {
@@ -463,7 +487,9 @@ describe('syncDirectoryMetadata', () => {
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
       expect(calls).toHaveLength(1);
-      expect(calls[0].args[0].input.Bucket).toBe(TEST_BUCKET);
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Bucket).toBe(TEST_BUCKET);
     });
   });
 
@@ -545,7 +571,9 @@ describe('syncDirectoryMetadata', () => {
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
       expect(calls).toHaveLength(1);
-      expect(calls[0].args[0].input.Key).toBe('index.html');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Key).toBe('index.html');
     });
 
     it('processes other hidden files with matching glob patterns', async () => {
@@ -678,7 +706,9 @@ describe('syncDirectoryMetadata', () => {
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
       expect(calls).toHaveLength(1);
-      expect(calls[0].args[0].input.Key).toBe('a/b/c/d/deep.txt');
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.Key).toBe('a/b/c/d/deep.txt');
     });
 
     it('handles files with same name in different directories', async () => {

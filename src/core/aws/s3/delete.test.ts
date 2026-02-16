@@ -36,7 +36,9 @@ describe('deleteDirectory', () => {
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
     expect(deleteCalls).toHaveLength(1);
-    expect(deleteCalls[0].args[0].input.Delete?.Objects).toEqual([
+    const deleteCall = deleteCalls[0];
+    if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+    expect(deleteCall.args[0].input.Delete?.Objects).toEqual([
       { Key: 'prefix/a.txt' },
       { Key: 'prefix/b.txt' },
     ]);
@@ -65,7 +67,9 @@ describe('deleteDirectory', () => {
     });
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
-    expect(deleteCalls[0].args[0].input.Delete?.Objects).toEqual([
+    const deleteCall = deleteCalls[0];
+    if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+    expect(deleteCall.args[0].input.Delete?.Objects).toEqual([
       { Key: 'a.txt' },
       { Key: 'b.txt' },
     ]);
@@ -91,8 +95,12 @@ describe('deleteDirectory', () => {
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
     expect(deleteCalls).toHaveLength(2);
-    expect(deleteCalls[0].args[0].input.Delete?.Objects).toHaveLength(1000);
-    expect(deleteCalls[1].args[0].input.Delete?.Objects).toHaveLength(500);
+    const deleteCall0 = deleteCalls[0];
+    const deleteCall1 = deleteCalls[1];
+    if (!deleteCall0 || !deleteCall1)
+      throw new Error('Expected DeleteObjectsCommand calls');
+    expect(deleteCall0.args[0].input.Delete?.Objects).toHaveLength(1000);
+    expect(deleteCall1.args[0].input.Delete?.Objects).toHaveLength(500);
   });
 
   it('does nothing when Contents is undefined', async () => {

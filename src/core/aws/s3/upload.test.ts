@@ -51,10 +51,12 @@ describe('uploadDirectory', () => {
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
     expect(putCalls).toHaveLength(1);
-    expect(putCalls[0].args[0].input.Key).toBe('index.html');
-    expect(putCalls[0].args[0].input.ContentType).toBe('text/html');
-    expect(putCalls[0].args[0].input.Bucket).toBe(TEST_BUCKET);
-    expect(putCalls[0].args[0].input.ACL).toBe('private');
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Key).toBe('index.html');
+    expect(putCall.args[0].input.ContentType).toBe('text/html');
+    expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
+    expect(putCall.args[0].input.ACL).toBe('private');
   });
 
   it('uploads files in subdirectories with correct S3 keys', async () => {
@@ -126,7 +128,9 @@ describe('uploadDirectory', () => {
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
     expect(deleteCalls).toHaveLength(1);
-    expect(deleteCalls[0].args[0].input.Delete?.Objects).toEqual([
+    const deleteCall = deleteCalls[0];
+    if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+    expect(deleteCall.args[0].input.Delete?.Objects).toEqual([
       { Key: 'old.txt' },
     ]);
   });
@@ -170,7 +174,9 @@ describe('uploadDirectory', () => {
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
-    expect(putCalls[0].args[0].input.Key).toBe('static/file.txt');
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Key).toBe('static/file.txt');
   });
 
   it('handles pagination for listing remote objects', async () => {
@@ -209,7 +215,9 @@ describe('uploadDirectory', () => {
     // Should delete the two remote-only files
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
     expect(deleteCalls).toHaveLength(1);
-    expect(deleteCalls[0].args[0].input.Delete?.Objects).toHaveLength(2);
+    const deleteCall = deleteCalls[0];
+    if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+    expect(deleteCall.args[0].input.Delete?.Objects).toHaveLength(2);
   });
 
   it('batches delete in groups of 1000', async () => {
@@ -238,8 +246,12 @@ describe('uploadDirectory', () => {
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
     expect(deleteCalls).toHaveLength(2);
-    expect(deleteCalls[0].args[0].input.Delete?.Objects).toHaveLength(1000);
-    expect(deleteCalls[1].args[0].input.Delete?.Objects).toHaveLength(500);
+    const deleteCall0 = deleteCalls[0];
+    const deleteCall1 = deleteCalls[1];
+    if (!deleteCall0 || !deleteCall1)
+      throw new Error('Expected DeleteObjectsCommand calls');
+    expect(deleteCall0.args[0].input.Delete?.Objects).toHaveLength(1000);
+    expect(deleteCall1.args[0].input.Delete?.Objects).toHaveLength(500);
   });
 
   it('applies default content type for unknown extensions', async () => {
@@ -262,6 +274,8 @@ describe('uploadDirectory', () => {
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
-    expect(putCalls[0].args[0].input.ContentType).toBe('text/plain');
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.ContentType).toBe('text/plain');
   });
 });
