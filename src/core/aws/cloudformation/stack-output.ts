@@ -3,11 +3,7 @@ import {
   DescribeStacksCommand,
 } from '@aws-sdk/client-cloudformation';
 import { getAwsOptions } from '@core/aws/iam';
-import {
-  type AwsProviderExtended,
-  S3OperationError,
-  StackOutputError,
-} from '@shared';
+import { type AwsProviderExtended, StackOutputError } from '@shared';
 
 export async function resolveStackOutput(
   provider: AwsProviderExtended,
@@ -21,7 +17,9 @@ export async function resolveStackOutput(
 
   const stackName = provider.naming['getStackName']?.();
   if (!stackName) {
-    throw new S3OperationError('');
+    throw new StackOutputError(
+      `Failed to resolve stack output '${outputKey}': stack name not found`,
+    );
   }
 
   const result = await cfn.send(
@@ -30,12 +28,16 @@ export async function resolveStackOutput(
 
   const outputs = result.Stacks?.[0]?.Outputs;
   if (!outputs) {
-    throw new StackOutputError(outputKey, stackName);
+    throw new StackOutputError(
+      `Failed to resolve stack output '${outputKey}' in stack '${stackName}'`,
+    );
   }
 
   const output = outputs.find((e) => e.OutputKey === outputKey);
   if (!output?.OutputValue) {
-    throw new StackOutputError(outputKey, stackName);
+    throw new StackOutputError(
+      `Output key '${outputKey}' not found in stack '${stackName}'`,
+    );
   }
 
   return output.OutputValue;

@@ -27,14 +27,12 @@ describe('ConfigValidationError', () => {
 
 describe('StackOutputError', () => {
   it('extends S3FerryError', () => {
-    expect(new StackOutputError('k', 's')).toBeInstanceOf(S3FerryError);
+    expect(new StackOutputError('test')).toBeInstanceOf(S3FerryError);
   });
 
-  it('formats message with outputKey and stackName', () => {
-    const err = new StackOutputError('MyOutput', 'my-stack');
-    expect(err.message).toBe(
-      "Failed to resolve stack Output 'MyOutput' in stack 'my-stack'",
-    );
+  it('sets correct name and message', () => {
+    const err = new StackOutputError('Custom error message');
+    expect(err.message).toBe('Custom error message');
     expect(err.name).toBe('StackOutputError');
   });
 });
