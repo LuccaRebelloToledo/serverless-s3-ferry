@@ -178,7 +178,7 @@ class ServerlessS3Ferry implements Plugin {
   }
 
   private isOffline(): boolean {
-    return this.offline || !!env.IS_OFFLINE;
+    return this.offline || !!env['IS_OFFLINE'];
   }
 
   private getProvider(): AwsProviderExtended {
@@ -186,7 +186,7 @@ class ServerlessS3Ferry implements Plugin {
   }
 
   private getS3FerryConfig(): RawS3FerryConfig | RawBucketConfig[] {
-    return this.serverless.service.custom.s3Ferry as
+    return this.serverless.service.custom['s3Ferry'] as
       | RawS3FerryConfig
       | RawBucketConfig[];
   }
@@ -425,12 +425,12 @@ class ServerlessS3Ferry implements Plugin {
           return;
         }
 
-        const tagsToUpdate: Tag[] = Object.keys(config.bucketTags).map(
-          (tagKey) => ({
+        const tagsToUpdate: Tag[] = Object.keys(config.bucketTags)
+          .map((tagKey) => ({
             Key: tagKey,
-            Value: config.bucketTags![tagKey],
-          }),
-        );
+            Value: config.bucketTags?.[tagKey],
+          }))
+          .filter((tag): tag is Tag => !!tag.Value);
 
         const bucketName = await this.getBucketName(config);
         if (this.options?.bucket && bucketName !== this.options.bucket) {

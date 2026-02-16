@@ -52,13 +52,16 @@ export function extractMetaParams(config: ParamEntry): S3Params {
 }
 
 export function buildParamMatchers(params: ParamEntry[]): ParamMatcher[] {
-  return params.map((param) => {
-    const glob = Object.keys(param)[0];
-    return {
-      glob,
-      params: extractMetaParams(param),
-    };
-  });
+  return params
+    .map((param) => {
+      const glob = Object.keys(param)[0];
+      if (!glob) return null;
+      return {
+        glob,
+        params: extractMetaParams(param),
+      };
+    })
+    .filter((matcher): matcher is ParamMatcher => !!matcher);
 }
 
 export function getNoSync(

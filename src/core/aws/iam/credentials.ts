@@ -29,7 +29,9 @@ export function getAwsOptions(provider: AwsProviderExtended): AwsClientOptions {
   const providerCredentials = provider.getCredentials();
   return {
     region:
-      provider.getRegion() || providerCredentials.region || DEFAULT_REGION,
-    credentials: providerCredentials.credentials as AwsCredentials | undefined,
+      provider.getRegion() || providerCredentials['region'] || DEFAULT_REGION,
+    credentials: providerCredentials['credentials'] as
+      | AwsCredentials
+      | undefined,
   };
 }

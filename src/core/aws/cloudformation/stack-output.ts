@@ -3,7 +3,11 @@ import {
   DescribeStacksCommand,
 } from '@aws-sdk/client-cloudformation';
 import { getAwsOptions } from '@core/aws/iam';
-import { type AwsProviderExtended, StackOutputError } from '@shared';
+import {
+  type AwsProviderExtended,
+  S3OperationError,
+  StackOutputError,
+} from '@shared';
 
 export async function resolveStackOutput(
   provider: AwsProviderExtended,
@@ -15,7 +19,10 @@ export async function resolveStackOutput(
     credentials: awsOptions.credentials,
   });
 
-  const stackName = provider.naming.getStackName();
+  const stackName = provider.naming['getStackName']?.();
+  if (!stackName) {
+    throw new S3OperationError('');
+  }
 
   const result = await cfn.send(
     new DescribeStacksCommand({ StackName: stackName }),

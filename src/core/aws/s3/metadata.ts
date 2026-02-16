@@ -65,12 +65,12 @@ export async function syncDirectoryMetadata(
     for (const match of matches) {
       if (ignored.has(match)) continue;
       const matchParams = extractMetaParams(param);
-      if (matchParams.OnlyForEnv && matchParams.OnlyForEnv !== env) {
+      if (matchParams['OnlyForEnv'] && matchParams['OnlyForEnv'] !== env) {
         ignored.add(match);
         fileMap.delete(match);
         continue;
       }
-      delete matchParams.OnlyForEnv;
+      delete matchParams['OnlyForEnv'];
       fileMap.set(match, { name: match, params: matchParams });
     }
   }

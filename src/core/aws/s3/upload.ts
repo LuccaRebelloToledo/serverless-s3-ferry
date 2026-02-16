@@ -58,11 +58,11 @@ function resolveS3Params(
   for (const param of params) {
     if (minimatch(localFile, `${path.resolve(localDir)}/${param.glob}`)) {
       Object.assign(s3Params, param.params);
-      onlyForEnv = s3Params.OnlyForEnv || onlyForEnv;
+      onlyForEnv = s3Params['OnlyForEnv'] || onlyForEnv;
     }
   }
 
-  delete s3Params.OnlyForEnv;
+  delete s3Params['OnlyForEnv'];
 
   if (onlyForEnv && onlyForEnv !== env) {
     return null; // skip this file
