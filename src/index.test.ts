@@ -2,6 +2,7 @@ import child_process from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { env } from 'node:process';
 import {
   CloudFormationClient,
   DescribeStacksCommand,
@@ -159,8 +160,10 @@ describe('ServerlessS3Ferry', () => {
 
       const putCalls = s3Mock.commandCalls(PutObjectCommand);
       expect(putCalls).toHaveLength(1);
-      expect(putCalls[0].args[0].input.Bucket).toBe(TEST_BUCKET);
-      expect(putCalls[0].args[0].input.Key).toBe('index.html');
+      const putCall = putCalls[0];
+      if (!putCall) throw new Error('Expected PutObjectCommand call');
+      expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
+      expect(putCall.args[0].input.Key).toBe('index.html');
     });
 
     it('logs error when config is missing', async () => {
@@ -181,7 +184,7 @@ describe('ServerlessS3Ferry', () => {
         string,
         ReturnType<typeof vi.fn>
       >;
-      expect(log.error).toHaveBeenCalledWith(
+      expect(log['error']).toHaveBeenCalledWith(
         expect.stringContaining('at least one configuration entry'),
       );
     });
@@ -260,7 +263,9 @@ describe('ServerlessS3Ferry', () => {
 
       const putCalls = s3Mock.commandCalls(PutObjectCommand);
       expect(putCalls).toHaveLength(1);
-      expect(putCalls[0].args[0].input.Bucket).toBe('resolved-bucket');
+      const putCall = putCalls[0];
+      if (!putCall) throw new Error('Expected PutObjectCommand call');
+      expect(putCall.args[0].input.Bucket).toBe('resolved-bucket');
     });
 
     it('executes preCommand before upload', async () => {
@@ -294,6 +299,7 @@ describe('ServerlessS3Ferry', () => {
 
         expect(execSyncSpy).toHaveBeenCalledWith('echo test', {
           stdio: 'inherit',
+          timeout: 120_000,
         });
       } finally {
         execSyncSpy.mockRestore();
@@ -336,7 +342,9 @@ describe('ServerlessS3Ferry', () => {
 
       const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
       expect(deleteCalls).toHaveLength(1);
-      expect(deleteCalls[0].args[0].input.Delete?.Objects).toEqual([
+      const deleteCall = deleteCalls[0];
+      if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+      expect(deleteCall.args[0].input.Delete?.Objects).toEqual([
         { Key: 'old.txt' },
       ]);
     });
@@ -359,7 +367,9 @@ describe('ServerlessS3Ferry', () => {
 
       const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
       expect(deleteCalls).toHaveLength(1);
-      expect(deleteCalls[0].args[0].input.Delete?.Objects).toEqual([
+      const deleteCall = deleteCalls[0];
+      if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+      expect(deleteCall.args[0].input.Delete?.Objects).toEqual([
         { Key: 'a.txt' },
         { Key: 'b.txt' },
       ]);
@@ -383,7 +393,7 @@ describe('ServerlessS3Ferry', () => {
         string,
         ReturnType<typeof vi.fn>
       >;
-      expect(log.notice).toHaveBeenCalledWith(
+      expect(log['notice']).toHaveBeenCalledWith(
         expect.stringContaining('No configuration found'),
       );
     });
@@ -429,7 +439,9 @@ describe('ServerlessS3Ferry', () => {
 
       const copyCalls = s3Mock.commandCalls(CopyObjectCommand);
       expect(copyCalls).toHaveLength(1);
-      expect(copyCalls[0].args[0].input.CacheControl).toBe('max-age=300');
+      const copyCall = copyCalls[0];
+      if (!copyCall) throw new Error('Expected CopyObjectCommand call');
+      expect(copyCall.args[0].input.CacheControl).toBe('max-age=300');
     });
 
     it('ignores files with mismatched OnlyForEnv', async () => {
@@ -479,7 +491,7 @@ describe('ServerlessS3Ferry', () => {
         string,
         ReturnType<typeof vi.fn>
       >;
-      expect(log.error).toHaveBeenCalledWith(
+      expect(log['error']).toHaveBeenCalledWith(
         expect.stringContaining('at least one configuration entry'),
       );
     });
@@ -545,7 +557,9 @@ describe('ServerlessS3Ferry', () => {
 
       const putCalls = s3Mock.commandCalls(PutBucketTaggingCommand);
       expect(putCalls).toHaveLength(1);
-      expect(putCalls[0].args[0].input.Tagging?.TagSet).toEqual([
+      const putCall = putCalls[0];
+      if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
+      expect(putCall.args[0].input.Tagging?.TagSet).toEqual([
         { Key: 'existing', Value: 'val' },
         { Key: 'env', Value: 'prod' },
       ]);
@@ -569,7 +583,7 @@ describe('ServerlessS3Ferry', () => {
         string,
         ReturnType<typeof vi.fn>
       >;
-      expect(log.error).toHaveBeenCalledWith(
+      expect(log['error']).toHaveBeenCalledWith(
         expect.stringContaining('at least one configuration entry'),
       );
     });
@@ -614,14 +628,16 @@ describe('ServerlessS3Ferry', () => {
 
       const putCalls = s3Mock.commandCalls(PutBucketTaggingCommand);
       expect(putCalls).toHaveLength(1);
-      expect(putCalls[0].args[0].input.Bucket).toBe('bucket-a');
+      const putCall = putCalls[0];
+      if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
+      expect(putCall.args[0].input.Bucket).toBe('bucket-a');
     });
   });
 
   describe('offline', () => {
     it('sync works when IS_OFFLINE env var is set', async () => {
-      const original = process.env.IS_OFFLINE;
-      process.env.IS_OFFLINE = 'true';
+      const original = env['IS_OFFLINE'];
+      env['IS_OFFLINE'] = 'true';
 
       try {
         fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
@@ -644,9 +660,9 @@ describe('ServerlessS3Ferry', () => {
         expect(putCalls).toHaveLength(1);
       } finally {
         if (original === undefined) {
-          delete process.env.IS_OFFLINE;
+          delete env['IS_OFFLINE'];
         } else {
-          process.env.IS_OFFLINE = original;
+          env['IS_OFFLINE'] = original;
         }
       }
     });

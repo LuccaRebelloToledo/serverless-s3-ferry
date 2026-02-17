@@ -64,6 +64,15 @@ describe('resolveStackOutput', () => {
         'Missing',
       ),
     ).rejects.toThrow(StackOutputError);
+
+    await expect(
+      resolveStackOutput(
+        mockProvider() as unknown as AwsProviderExtended,
+        'Missing',
+      ),
+    ).rejects.toThrow(
+      `Output key 'Missing' not found in stack '${TEST_STACK_NAME}'`,
+    );
   });
 
   it('throws StackOutputError when Stacks is empty or undefined', async () => {
@@ -76,6 +85,15 @@ describe('resolveStackOutput', () => {
       ),
     ).rejects.toThrow(StackOutputError);
 
+    await expect(
+      resolveStackOutput(
+        mockProvider() as unknown as AwsProviderExtended,
+        'BucketName',
+      ),
+    ).rejects.toThrow(
+      `Failed to resolve stack output 'BucketName' in stack '${TEST_STACK_NAME}'`,
+    );
+
     cfnMock.reset();
     cfnMock.on(DescribeStacksCommand).resolves({});
 
@@ -85,6 +103,15 @@ describe('resolveStackOutput', () => {
         'BucketName',
       ),
     ).rejects.toThrow(StackOutputError);
+
+    await expect(
+      resolveStackOutput(
+        mockProvider() as unknown as AwsProviderExtended,
+        'BucketName',
+      ),
+    ).rejects.toThrow(
+      `Failed to resolve stack output 'BucketName' in stack '${TEST_STACK_NAME}'`,
+    );
   });
 
   it('throws StackOutputError when no outputs exist', async () => {
@@ -104,5 +131,31 @@ describe('resolveStackOutput', () => {
         'BucketName',
       ),
     ).rejects.toThrow(StackOutputError);
+
+    await expect(
+      resolveStackOutput(
+        mockProvider() as unknown as AwsProviderExtended,
+        'BucketName',
+      ),
+    ).rejects.toThrow(
+      `Failed to resolve stack output 'BucketName' in stack '${TEST_STACK_NAME}'`,
+    );
+  });
+
+  it('throws StackOutputError when stack name cannot be resolved', async () => {
+    const providerWithoutStackName = {
+      ...mockProvider(),
+      naming: {},
+    } as unknown as AwsProviderExtended;
+
+    await expect(
+      resolveStackOutput(providerWithoutStackName, 'BucketName'),
+    ).rejects.toThrow(StackOutputError);
+
+    await expect(
+      resolveStackOutput(providerWithoutStackName, 'BucketName'),
+    ).rejects.toThrow(
+      "Failed to resolve stack output 'BucketName': stack name not found",
+    );
   });
 });

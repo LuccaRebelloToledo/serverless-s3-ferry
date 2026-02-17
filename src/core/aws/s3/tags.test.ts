@@ -52,6 +52,7 @@ describe('updateBucketTags', () => {
     await updateBucketTags(client, TEST_BUCKET, [{ Key: 'new', Value: 'tag' }]);
 
     const putCall = s3Mock.commandCalls(PutBucketTaggingCommand)[0];
+    if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
     expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
     expect(putCall.args[0].input.Tagging?.TagSet).toEqual([
       { Key: 'existing', Value: 'val' },
@@ -69,6 +70,7 @@ describe('updateBucketTags', () => {
     await updateBucketTags(client, TEST_BUCKET, [{ Key: 'new', Value: 'tag' }]);
 
     const putCall = s3Mock.commandCalls(PutBucketTaggingCommand)[0];
+    if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
     expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
     expect(putCall.args[0].input.Tagging?.TagSet).toEqual([
       { Key: 'new', Value: 'tag' },

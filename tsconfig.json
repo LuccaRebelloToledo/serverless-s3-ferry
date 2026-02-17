@@ -1,26 +1,61 @@
 {
   "compilerOptions": {
+    /* Language and Environment */
     "target": "ES2022",
-    "module": "commonjs",
     "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "baseUrl": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+
+    /* Modules */
+    "module": "commonjs",
     "moduleResolution": "node",
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+
+    /* Paths */
+    "baseUrl": "./src",
     "paths": {
       "@shared/*": ["./shared/*"],
       "@shared": ["shared/index"],
       "@core/*": ["./core/*"]
-    }
+    },
+
+    /* Emit */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "inlineSourceMap": false,
+    "newLine": "lf",
+    "stripInternal": true,
+    "noEmitOnError": true,
+
+    /* Incremental Builds */
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+
+    /* Type Checking - Strict */
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+
+    /* Type Checking - Additional */
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    /* Linting & Code Quality */
+    "noFallthroughCasesInSwitch": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Completeness */
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "coverage"]
 }

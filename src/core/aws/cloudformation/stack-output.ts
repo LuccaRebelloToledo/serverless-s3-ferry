@@ -15,7 +15,12 @@ export async function resolveStackOutput(
     credentials: awsOptions.credentials,
   });
 
-  const stackName = provider.naming.getStackName();
+  const stackName = provider.naming['getStackName']?.();
+  if (!stackName) {
+    throw new StackOutputError(
+      `Failed to resolve stack output '${outputKey}': stack name not found`,
+    );
+  }
 
   const result = await cfn.send(
     new DescribeStacksCommand({ StackName: stackName }),
@@ -23,12 +28,16 @@ export async function resolveStackOutput(
 
   const outputs = result.Stacks?.[0]?.Outputs;
   if (!outputs) {
-    throw new StackOutputError(outputKey, stackName);
+    throw new StackOutputError(
+      `Failed to resolve stack output '${outputKey}' in stack '${stackName}'`,
+    );
   }
 
   const output = outputs.find((e) => e.OutputKey === outputKey);
   if (!output?.OutputValue) {
-    throw new StackOutputError(outputKey, stackName);
+    throw new StackOutputError(
+      `Output key '${outputKey}' not found in stack '${stackName}'`,
+    );
   }
 
   return output.OutputValue;
