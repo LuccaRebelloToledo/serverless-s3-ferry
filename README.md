@@ -8,6 +8,8 @@
 
 A Serverless Framework plugin that syncs local directories to Amazon S3 buckets using AWS SDK v3. ⚡
 
+Built on AWS SDK v3 and actively maintained, it is a drop-in replacement for the archived [`serverless-s3-sync`](https://github.com/k1LoW/serverless-s3-sync) plugin.
+
 ## Background
 
 This plugin was independently developed to provide S3 sync
@@ -33,6 +35,7 @@ This implementation does not reuse any code from the original project.
 - [Installation](#installation)
 - [Compatibility](#compatibility)
 - [Configuration](#configuration)
+- [Configuration Reference](#configuration-reference)
 - [Usage](#usage)
 - [Offline Usage](#offline-usage)
 - [Advanced Configuration](#advanced-configuration)
@@ -55,9 +58,9 @@ plugins:
 
 ## Compatibility
 
-| serverless-s3-ferry | Serverless Framework |
-| ------------------- | -------------------- |
-| >= v1.0.0           | v4.x                 |
+| serverless-s3-ferry | Serverless Framework | Node.js    |
+| ------------------- | -------------------- | ---------- |
+| >= v1.0.0           | v4.x                 | >= 18.0.0  |
 
 ## Configuration
 
@@ -75,6 +78,7 @@ custom:
       deleteRemoved: true # optional, indicates whether sync deletes files no longer present in localDir. Defaults to 'true'
       acl: public-read # optional
       defaultContentType: text/html # optional
+      preCommand: npm run build # optional, runs before sync
       params: # optional
         - index.html:
             CacheControl: 'no-cache'
@@ -95,9 +99,9 @@ custom:
 
     # Setting the optional enabled field to false will disable this rule.
     # Referencing other variables allows this rule to become conditional
-    - bucketName: DisabledSync
+    - bucketName: conditional-bucket
       localDir: path
-      enabled: false
+      enabled: ${param:syncEnabled, true}  # driven by deploy parameter
 
 resources:
   Resources:
@@ -120,6 +124,35 @@ resources:
       Value: !Ref AnotherBucket
 ```
 
+## Configuration Reference
+
+### Per-bucket options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `bucketName` | string | — | Target S3 bucket name (required unless `bucketNameKey`) |
+| `bucketNameKey` | string | — | CloudFormation output key resolving to bucket name |
+| `localDir` | string | — | Local directory to sync (required) |
+| `bucketPrefix` | string | `''` | S3 key prefix for uploaded files |
+| `deleteRemoved` | boolean | `true` | Delete S3 objects absent from `localDir` |
+| `acl` | string | `'private'` | S3 object ACL |
+| `defaultContentType` | string | — | Fallback MIME type |
+| `params` | array | — | Per-file S3 params via glob patterns |
+| `bucketTags` | object | — | Tags to merge into the bucket |
+| `enabled` | boolean | `true` | Disable this sync rule when `false` |
+| `preCommand` | string | — | Shell command to run before sync |
+
+### Global options
+
+These are set directly on the `s3Ferry` object (instead of using the array shorthand):
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `endpoint` | string | — | Custom S3 endpoint (e.g., for local development) |
+| `noSync` | boolean | `false` | Disable auto-sync on deploy/remove |
+| `hooks` | string[] | — | Additional lifecycle hooks to trigger sync |
+| `buckets` | array | — | Bucket config list (required when using global options) |
+
 ## Usage
 
 Run `sls deploy` -- local directories are synced to their configured S3 prefixes.
@@ -133,6 +166,14 @@ Run `sls remove --nos3ferry` -- remove the stack without deleting S3 objects.
 ### `sls s3ferry`
 
 Sync local directories and S3 prefixes on demand.
+
+### `sls s3ferry bucket`
+
+Sync a specific bucket only.
+
+```sh
+sls s3ferry bucket -b my-static-site-assets
+```
 
 ## Offline Usage
 
@@ -188,6 +229,18 @@ custom:
       bucketPrefix: assets/ # optional
       localDir: dist/assets # required
 # ...
+```
+
+### Environment-scoped file params
+
+Use the `OnlyForEnv` param to upload a file only when a specific stage is active:
+
+```yaml
+# Only upload this file when STAGE=production
+params:
+  - "*.production.js":
+      CacheControl: 'max-age=31536000'
+      OnlyForEnv: production
 ```
 
 ## Contributing
