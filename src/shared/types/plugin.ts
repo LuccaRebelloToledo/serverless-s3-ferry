@@ -22,7 +22,6 @@ export interface S3FerryOptions extends Serverless.Options {
   nos3ferry?: boolean;
   offline?: string | boolean;
   bucket?: string;
-  env?: string;
 }
 
 // Extend Aws provider with cachedCredentials (not typed in @types/serverless)

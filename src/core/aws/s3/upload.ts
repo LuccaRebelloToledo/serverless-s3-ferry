@@ -28,7 +28,7 @@ export interface UploadDirectoryOptions extends UploadDirOptions {
   s3Client: S3Client;
   progress: Plugin.Progress;
   servicePath: string;
-  env?: string;
+  stage?: string;
   log?: ErrorLogger;
 }
 
@@ -45,26 +45,26 @@ function computeMD5(content: Buffer): string {
 function resolveS3Params(
   localFile: string,
   localDir: string,
-  params: ParamMatcher[] | undefined,
-  env: string | undefined,
+  params?: ParamMatcher[],
+  stage?: string,
 ): S3Params | null {
   if (!params || params.length === 0) {
     return {};
   }
 
   const s3Params: S3Params = {};
-  let onlyForEnv: string | undefined;
+  let onlyForStage: string | undefined;
 
   for (const param of params) {
     if (minimatch(localFile, `${path.resolve(localDir)}/${param.glob}`)) {
       Object.assign(s3Params, param.params);
-      onlyForEnv = s3Params['OnlyForEnv'] || onlyForEnv;
+      onlyForStage = s3Params['OnlyForStage'] || onlyForStage;
     }
   }
 
-  delete s3Params['OnlyForEnv'];
+  delete s3Params['OnlyForStage'];
 
-  if (onlyForEnv && onlyForEnv !== env) {
+  if (onlyForStage && onlyForStage !== stage) {
     return null; // skip this file
   }
 
@@ -85,7 +85,7 @@ export async function uploadDirectory(
     params,
     maxConcurrency = DEFAULT_MAX_CONCURRENCY,
     progress,
-    env,
+    stage,
     log,
   } = options;
 
@@ -111,7 +111,7 @@ export async function uploadDirectory(
     localKeys.add(s3Key);
 
     // Resolve per-file S3 params (may return null to skip)
-    const s3Params = resolveS3Params(localFile, localDir, params, env);
+    const s3Params = resolveS3Params(localFile, localDir, params, stage);
     if (s3Params === null) {
       continue;
     }
