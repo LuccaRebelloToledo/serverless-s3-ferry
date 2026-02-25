@@ -1,12 +1,15 @@
 import { ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3';
 import type { S3Object } from '@shared';
 
-export async function listAllObjects(
+/**
+ * Lists all objects in an S3 bucket with a prefix using an async generator
+ * to be memory efficient.
+ */
+export async function* listAllObjects(
   s3Client: S3Client,
   bucket: string,
   prefix: string,
-): Promise<S3Object[]> {
-  const objects: S3Object[] = [];
+): AsyncGenerator<S3Object> {
   let continuationToken: string | undefined;
 
   do {
@@ -21,11 +24,11 @@ export async function listAllObjects(
     if (response.Contents) {
       for (const obj of response.Contents) {
         if (obj.Key) {
-          objects.push({
+          yield {
             Key: obj.Key,
             ETag: obj.ETag,
             Size: obj.Size,
-          });
+          };
         }
       }
     }
@@ -34,6 +37,4 @@ export async function listAllObjects(
       ? response.NextContinuationToken
       : undefined;
   } while (continuationToken);
-
-  return objects;
 }

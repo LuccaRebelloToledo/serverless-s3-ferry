@@ -1,9 +1,5 @@
 import { DeleteObjectsCommand, type S3Client } from '@aws-sdk/client-s3';
-import {
-  createProgressTracker,
-  type Plugin,
-  S3_DELETE_BATCH_SIZE,
-} from '@shared';
+import { type Plugin, S3_DELETE_BATCH_SIZE } from '@shared';
 import { listAllObjects } from './list';
 
 export interface DeleteDirOptions {
@@ -41,20 +37,28 @@ export async function deleteDirectory(
 ): Promise<void> {
   const { s3Client, bucket, prefix, progress } = options;
 
-  const objects = await listAllObjects(s3Client, bucket, prefix);
-  const allKeys = objects.map((obj) => obj.Key);
+  let currentBatch: string[] = [];
+  let totalDeleted = 0;
 
-  if (allKeys.length === 0) {
-    return;
+  for await (const obj of listAllObjects(s3Client, bucket, prefix)) {
+    if (obj.Key) {
+      currentBatch.push(obj.Key);
+    }
+
+    if (currentBatch.length >= S3_DELETE_BATCH_SIZE) {
+      await deleteObjectsByKeys(s3Client, bucket, currentBatch);
+      totalDeleted += currentBatch.length;
+      currentBatch = [];
+      progress.update(
+        `${bucket}: removing files with prefix ${prefix} (${totalDeleted} objects removed)`,
+      );
+    }
   }
 
-  const tracker = createProgressTracker(
-    progress,
-    (percent) =>
-      `${bucket}: removing files with prefix ${prefix} (${percent}%)`,
-  );
+  if (currentBatch.length > 0) {
+    await deleteObjectsByKeys(s3Client, bucket, currentBatch);
+    totalDeleted += currentBatch.length;
+  }
 
-  await deleteObjectsByKeys(s3Client, bucket, allKeys, (deletedSoFar, total) =>
-    tracker.update(deletedSoFar, total),
-  );
+  progress.update(`${bucket}: removing files with prefix ${prefix} (100%)`);
 }

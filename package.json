@@ -40,8 +40,9 @@
     "prepare": "husky || true"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "^3.993.0",
-    "@aws-sdk/client-s3": "^3.993.0",
+    "@aws-sdk/client-cloudformation": "^3.998.0",
+    "@aws-sdk/client-s3": "^3.998.0",
+    "@aws-sdk/lib-storage": "^3.998.0",
     "mime": "^4.1.0",
     "minimatch": "^10.2.0",
     "p-limit": "^3.1.0"

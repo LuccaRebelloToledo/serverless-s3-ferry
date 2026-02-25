@@ -16,10 +16,13 @@ import {
   buildParamMatchers,
   ConfigValidationError,
   DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_OFFLINE_VALUE,
+  DEFAULT_PRE_COMMAND_TIMEOUT,
   getBucketConfigs,
   getCustomHooks,
   getEndpoint,
   getNoSync,
+  OFFLINE_ENV_VAR,
   type Plugin,
   parseBucketConfig,
   type RawBucketConfig,
@@ -51,7 +54,8 @@ class ServerlessS3Ferry implements Plugin {
     this.log = logging.log;
     this.progress = logging.progress;
     this.servicePath = this.serverless.service.serverless.config.servicePath;
-    this.offline = String(this.options.offline).toUpperCase() === 'TRUE';
+    this.offline =
+      String(this.options.offline).toUpperCase() === DEFAULT_OFFLINE_VALUE;
 
     this.commands = {
       s3ferry: {
@@ -178,7 +182,7 @@ class ServerlessS3Ferry implements Plugin {
   }
 
   private isOffline(): boolean {
-    return this.offline || !!env['IS_OFFLINE'];
+    return this.offline || !!env[OFFLINE_ENV_VAR];
   }
 
   private getProvider(): AwsProviderExtended {
@@ -229,6 +233,25 @@ class ServerlessS3Ferry implements Plugin {
     return getBucketConfigs(this.getS3FerryConfig());
   }
 
+  private runPreCommand(
+    command: string,
+    bucketProgress: Plugin.Progress,
+  ): void {
+    this.log.verbose(`Running pre-command: ${command}`);
+    bucketProgress.update(`running pre-command...`);
+
+    try {
+      child_process.execSync(command, {
+        stdio: 'inherit',
+        timeout: DEFAULT_PRE_COMMAND_TIMEOUT,
+        cwd: this.servicePath,
+      });
+    } catch (error) {
+      this.log.error(`Pre-command failed: ${command}`);
+      throw error;
+    }
+  }
+
   async sync(invokedAsCommand?: boolean): Promise<void> {
     const rawBuckets = this.getRawBucketConfigs();
     if (!rawBuckets) {
@@ -262,11 +285,7 @@ class ServerlessS3Ferry implements Plugin {
 
         try {
           if (config.preCommand) {
-            bucketProgress.update(`${localDir}: running pre-command...`);
-            child_process.execSync(config.preCommand, {
-              stdio: 'inherit',
-              timeout: 120_000,
-            });
+            this.runPreCommand(config.preCommand, bucketProgress);
           }
 
           const paramMatchers = buildParamMatchers(config.params);

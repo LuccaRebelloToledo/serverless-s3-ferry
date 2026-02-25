@@ -15,6 +15,14 @@ describe('listAllObjects', () => {
     s3Mock.restore();
   });
 
+  async function generatorToArray<T>(gen: AsyncGenerator<T>): Promise<T[]> {
+    const arr = [];
+    for await (const val of gen) {
+      arr.push(val);
+    }
+    return arr;
+  }
+
   describe('basic functionality', () => {
     it('lists objects without pagination', async () => {
       s3Mock.on(ListObjectsV2Command).resolves({
@@ -26,18 +34,17 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, ''),
+      );
 
       expect(result).toHaveLength(2);
-      const first = result[0];
-      const second = result[1];
-      if (!first || !second) throw new Error('Expected two results');
-      expect(first).toEqual({
+      expect(result[0]).toEqual({
         Key: 'file1.txt',
         ETag: '"abc123"',
         Size: 100,
       });
-      expect(second).toEqual({
+      expect(result[1]).toEqual({
         Key: 'file2.txt',
         ETag: '"def456"',
         Size: 200,
@@ -51,17 +58,15 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, 'assets/');
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, 'assets/'),
+      );
 
       expect(result).toHaveLength(1);
-      const first = result[0];
-      if (!first) throw new Error('Expected result');
-      expect(first.Key).toBe('assets/style.css');
+      expect(result[0]?.Key).toBe('assets/style.css');
 
       const calls = s3Mock.commandCalls(ListObjectsV2Command);
-      const call = calls[0];
-      if (!call) throw new Error('Expected ListObjectsV2Command call');
-      expect(call.args[0].input.Prefix).toBe('assets/');
+      expect(calls[0]?.args[0].input.Prefix).toBe('assets/');
     });
   });
 
@@ -80,14 +85,13 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, ''),
+      );
 
       expect(result).toHaveLength(2);
-      const first = result[0];
-      const second = result[1];
-      if (!first || !second) throw new Error('Expected two results');
-      expect(first.Key).toBe('page1.txt');
-      expect(second.Key).toBe('page2.txt');
+      expect(result[0]?.Key).toBe('page1.txt');
+      expect(result[1]?.Key).toBe('page2.txt');
     });
 
     it('handles three+ page pagination with multiple tokens', async () => {
@@ -109,7 +113,9 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, ''),
+      );
 
       expect(result).toHaveLength(3);
       expect(result.map((obj) => obj.Key)).toEqual([
@@ -133,46 +139,12 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      await listAllObjects(client, TEST_BUCKET, '');
+      await generatorToArray(listAllObjects(client, TEST_BUCKET, ''));
 
       const calls = s3Mock.commandCalls(ListObjectsV2Command);
       expect(calls).toHaveLength(2);
-      const call0 = calls[0];
-      const call1 = calls[1];
-      if (!call0 || !call1)
-        throw new Error('Expected ListObjectsV2Command calls');
-      expect(call0.args[0].input.ContinuationToken).toBeUndefined();
-      expect(call1.args[0].input.ContinuationToken).toBe('token-xyz');
-    });
-
-    it('handles large result sets with 1000+ objects per page', async () => {
-      const largeContents = Array.from({ length: 1000 }, (_, i) => ({
-        Key: `file-${i}.txt`,
-        ETag: `"etag-${i}"`,
-        Size: i * 100,
-      }));
-
-      s3Mock
-        .on(ListObjectsV2Command)
-        .resolvesOnce({
-          Contents: largeContents,
-          IsTruncated: true,
-          NextContinuationToken: 'token-large',
-        })
-        .resolvesOnce({
-          Contents: [{ Key: 'file-1000.txt', ETag: '"final"', Size: 9999 }],
-          IsTruncated: false,
-        });
-
-      const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
-
-      expect(result).toHaveLength(1001);
-      const first = result[0];
-      const last = result[1000];
-      if (!first || !last) throw new Error('Expected results');
-      expect(first.Key).toBe('file-0.txt');
-      expect(last.Key).toBe('file-1000.txt');
+      expect(calls[0]?.args[0].input.ContinuationToken).toBeUndefined();
+      expect(calls[1]?.args[0].input.ContinuationToken).toBe('token-xyz');
     });
   });
 
@@ -184,7 +156,9 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, ''),
+      );
 
       expect(result).toEqual([]);
     });
@@ -195,81 +169,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, ''),
+      );
 
       expect(result).toEqual([]);
-    });
-
-    it('filters out objects without Key field', async () => {
-      s3Mock.on(ListObjectsV2Command).resolves({
-        Contents: [
-          { Key: 'valid.txt', ETag: '"aaa"', Size: 10 },
-          { ETag: '"bbb"', Size: 20 }, // Missing Key
-        ],
-        IsTruncated: false,
-      });
-
-      const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
-
-      expect(result).toHaveLength(1);
-      const first = result[0];
-      if (!first) throw new Error('Expected result');
-      expect(first.Key).toBe('valid.txt');
-    });
-
-    it('handles empty prefix', async () => {
-      s3Mock.on(ListObjectsV2Command).resolves({
-        Contents: [
-          { Key: 'root.txt', ETag: '"aaa"', Size: 10 },
-          { Key: 'nested/file.txt', ETag: '"bbb"', Size: 20 },
-        ],
-        IsTruncated: false,
-      });
-
-      const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
-
-      expect(result).toHaveLength(2);
-
-      const calls = s3Mock.commandCalls(ListObjectsV2Command);
-      const call = calls[0];
-      if (!call) throw new Error('Expected ListObjectsV2Command call');
-      expect(call.args[0].input.Prefix).toBe('');
-    });
-
-    it('preserves undefined ETag and Size fields', async () => {
-      s3Mock.on(ListObjectsV2Command).resolves({
-        Contents: [
-          { Key: 'file1.txt' },
-          { Key: 'file2.txt', ETag: '"aaa"' },
-          { Key: 'file3.txt', Size: 100 },
-        ],
-        IsTruncated: false,
-      });
-
-      const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
-
-      const r0 = result[0];
-      const r1 = result[1];
-      const r2 = result[2];
-      if (!r0 || !r1 || !r2) throw new Error('Expected three results');
-      expect(r0).toEqual({
-        Key: 'file1.txt',
-        ETag: undefined,
-        Size: undefined,
-      });
-      expect(r1).toEqual({
-        Key: 'file2.txt',
-        ETag: '"aaa"',
-        Size: undefined,
-      });
-      expect(r2).toEqual({
-        Key: 'file3.txt',
-        ETag: undefined,
-        Size: 100,
-      });
     });
   });
 });

@@ -11,6 +11,7 @@ import {
   CopyObjectCommand,
   DeleteObjectsCommand,
   GetBucketTaggingCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutBucketTaggingCommand,
   PutObjectCommand,
@@ -300,6 +301,7 @@ describe('ServerlessS3Ferry', () => {
         expect(execSyncSpy).toHaveBeenCalledWith('echo test', {
           stdio: 'inherit',
           timeout: 120_000,
+          cwd: tmpDir,
         });
       } finally {
         execSyncSpy.mockRestore();
@@ -458,6 +460,7 @@ describe('ServerlessS3Ferry', () => {
     it('copies objects with metadata params', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const plugin = new ServerlessS3Ferry(
@@ -487,6 +490,7 @@ describe('ServerlessS3Ferry', () => {
     it('ignores files with mismatched OnlyForStage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const plugin = new ServerlessS3Ferry(
@@ -542,6 +546,7 @@ describe('ServerlessS3Ferry', () => {
     it('filters by --bucket option', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.css'), 'body{}');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const plugin = new ServerlessS3Ferry(
@@ -708,6 +713,7 @@ describe('ServerlessS3Ferry', () => {
   describe('hook: s3ferry:metadata logs success', () => {
     it('logs success when invoked as command', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const logging = mockLogging();
@@ -969,6 +975,7 @@ describe('ServerlessS3Ferry', () => {
 
     it('s3ferry:bucket:metadata runs syncMetadata', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const logging = mockLogging();

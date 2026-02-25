@@ -1,18 +1,17 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  PutObjectCommand,
-  type PutObjectCommandInput,
-  type S3Client,
-} from '@aws-sdk/client-s3';
+import type { S3Client } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import {
   createProgressTracker,
+  DEFAULT_CONTENT_TYPE,
   DEFAULT_MAX_CONCURRENCY,
   type ErrorLogger,
   getLocalFiles,
   type ParamMatcher,
   type Plugin,
+  S3_MULTIPART_UPLOAD_PART_SIZE,
+  S3_MULTIPART_UPLOAD_QUEUE_SIZE,
   type S3Object,
   type S3Params,
   toS3Path,
@@ -22,6 +21,7 @@ import mime from 'mime';
 import { minimatch } from 'minimatch';
 import pLimit from 'p-limit';
 import { deleteObjectsByKeys } from './delete';
+import { computeFileMD5 } from './hash';
 import { listAllObjects } from './list';
 
 export interface UploadDirectoryOptions extends UploadDirOptions {
@@ -36,10 +36,6 @@ interface FileProcessEntry {
   localPath: string;
   s3Key: string;
   s3Params: S3Params;
-}
-
-function computeMD5(content: Buffer): string {
-  return `"${crypto.createHash('md5').update(content).digest('hex')}"`;
 }
 
 function resolveS3Params(
@@ -91,20 +87,17 @@ export async function uploadDirectory(
     log,
   } = options;
 
-  const localFiles = getLocalFiles(localDir, log);
-  const remoteObjects = await listAllObjects(s3Client, bucket, prefix);
-
   // Build a map of remote objects by key for quick lookup
   const remoteByKey = new Map<string, S3Object>();
-  for (const obj of remoteObjects) {
+  for await (const obj of listAllObjects(s3Client, bucket, prefix)) {
     remoteByKey.set(obj.Key, obj);
   }
 
-  // Build list of candidate files and track local keys (without reading file content)
+  // Build list of candidate files and track local keys
   const filesToProcess: FileProcessEntry[] = [];
   const localKeys = new Set<string>();
 
-  for (const localFile of localFiles) {
+  for await (const localFile of getLocalFiles(localDir, log)) {
     const relativePath = path.relative(localDir, localFile);
     const s3Key = prefix
       ? `${prefix}${toS3Path(relativePath)}`
@@ -140,38 +133,47 @@ export async function uploadDirectory(
     (percent) => `${localDir}: sync with bucket ${bucket} (${percent}%)`,
   );
 
-  // Read, compare MD5, and upload in a single pass per file (inside pLimit)
-  // Only maxConcurrency file buffers are in memory at any given time
+  // Stream, compare ETag/MD5, and upload in a single pass per file
   const limit = pLimit(maxConcurrency);
   await Promise.all(
     filesToProcess.map((entry) =>
       limit(async () => {
-        const buffer = await fs.promises.readFile(entry.localPath);
-        const localMD5 = computeMD5(buffer);
-
         // Check if file has changed by comparing MD5 with ETag
         const remote = remoteByKey.get(entry.s3Key);
-        if (remote?.ETag && localMD5 === remote.ETag) {
-          completedOperations++;
-          tracker.update(completedOperations, totalOperations);
-          return; // file unchanged
+
+        // For large files, multipart ETags have a different format (e.g. hash-number)
+        // If it's a simple MD5 hash, we compare it.
+        if (remote?.ETag && !remote.ETag.includes('-')) {
+          const localMD5 = await computeFileMD5(entry.localPath);
+          if (localMD5 === remote.ETag) {
+            completedOperations++;
+            tracker.update(completedOperations, totalOperations);
+            return; // file unchanged
+          }
         }
 
         const contentType =
           mime.getType(entry.localPath) ??
           defaultContentType ??
-          'application/octet-stream';
+          DEFAULT_CONTENT_TYPE;
 
-        const putParams: PutObjectCommandInput = {
-          Bucket: bucket,
-          Key: entry.s3Key,
-          Body: buffer,
-          ACL: acl,
-          ContentType: contentType,
-          ...entry.s3Params,
-        };
+        const parallelUploads3 = new Upload({
+          client: s3Client,
+          params: {
+            Bucket: bucket,
+            Key: entry.s3Key,
+            Body: fs.createReadStream(entry.localPath),
+            ACL: acl,
+            ContentType: contentType,
+            ...entry.s3Params,
+          },
+          // Optimal part size for multipart upload is 5MB by default
+          queueSize: S3_MULTIPART_UPLOAD_QUEUE_SIZE, // concurrent parts per file
+          partSize: S3_MULTIPART_UPLOAD_PART_SIZE,
+          leavePartsOnError: false,
+        });
 
-        await s3Client.send(new PutObjectCommand(putParams));
+        await parallelUploads3.done();
 
         completedOperations++;
         tracker.update(completedOperations, totalOperations);

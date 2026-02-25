@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CopyObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CopyObjectCommand,
+  HeadObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -26,6 +30,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>test</h1>');
       fs.writeFileSync(path.join(tmpDir, 'style.css'), 'body{}');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -56,6 +61,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'assets', 'style.css'), 'css');
       fs.writeFileSync(path.join(tmpDir, 'index.html'), 'html');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -78,6 +84,7 @@ describe('syncDirectoryMetadata', () => {
     it('applies last matching pattern when multiple patterns overlap', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>test</h1>');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -103,6 +110,7 @@ describe('syncDirectoryMetadata', () => {
     it('handles pattern priority with later patterns overriding earlier ones', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -132,6 +140,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'prod.js'), 'code');
       fs.writeFileSync(path.join(tmpDir, 'all.js'), 'code');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -159,6 +168,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'dev.js'), 'code');
       fs.writeFileSync(path.join(tmpDir, 'prod.js'), 'code');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -186,6 +196,7 @@ describe('syncDirectoryMetadata', () => {
     it('handles undefined stage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.js'), 'code');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -206,6 +217,7 @@ describe('syncDirectoryMetadata', () => {
     it('removes OnlyForStage from final parameters', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.js'), 'code');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -236,6 +248,7 @@ describe('syncDirectoryMetadata', () => {
     it('skips file excluded by OnlyForStage in first pattern but matches later pattern', async () => {
       fs.writeFileSync(path.join(tmpDir, 'config.js'), 'code');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -264,6 +277,7 @@ describe('syncDirectoryMetadata', () => {
     it('detects content type from file extension', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>test</h1>');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -286,6 +300,7 @@ describe('syncDirectoryMetadata', () => {
     it('uses default content type for unknown extensions', async () => {
       fs.writeFileSync(path.join(tmpDir, 'data.unknownext'), 'stuff');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -309,6 +324,7 @@ describe('syncDirectoryMetadata', () => {
     it('handles undefined content type when no detection and no default', async () => {
       fs.writeFileSync(path.join(tmpDir, 'data.unknown123'), 'stuff');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -335,6 +351,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), 'html');
       fs.writeFileSync(path.join(tmpDir, 'assets', 'style.css'), 'css');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -356,6 +373,7 @@ describe('syncDirectoryMetadata', () => {
     it('constructs correct S3 keys with prefix', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -378,6 +396,7 @@ describe('syncDirectoryMetadata', () => {
     it('normalizes bucket prefix with leading slash', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -400,6 +419,7 @@ describe('syncDirectoryMetadata', () => {
     it('constructs copySource paths correctly', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -424,6 +444,7 @@ describe('syncDirectoryMetadata', () => {
     it('encodes special characters in paths', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file with spaces.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -449,6 +470,7 @@ describe('syncDirectoryMetadata', () => {
     it('uses last matching pattern when multiple patterns match same file', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), 'html');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -475,6 +497,7 @@ describe('syncDirectoryMetadata', () => {
     it('handles empty params', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -506,6 +529,7 @@ describe('syncDirectoryMetadata', () => {
       let activeCount = 0;
       let maxActive = 0;
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).callsFake(async () => {
         activeCount++;
         maxActive = Math.max(maxActive, activeCount);
@@ -536,6 +560,7 @@ describe('syncDirectoryMetadata', () => {
         fs.writeFileSync(path.join(tmpDir, `file${i}.txt`), 'data');
       }
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -559,6 +584,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), 'html');
       fs.writeFileSync(path.join(tmpDir, '.DS_Store'), 'junk');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -583,6 +609,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, '.gitignore'), 'ignored');
       fs.writeFileSync(path.join(tmpDir, '.env'), 'vars');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -608,6 +635,7 @@ describe('syncDirectoryMetadata', () => {
     it('updates progress on completion with 100 percent', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -628,6 +656,7 @@ describe('syncDirectoryMetadata', () => {
     });
 
     it('reports 0% for empty directory', async () => {
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -650,6 +679,7 @@ describe('syncDirectoryMetadata', () => {
 
   describe('edge cases', () => {
     it('handles empty directory', async () => {
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -670,6 +700,7 @@ describe('syncDirectoryMetadata', () => {
     it('handles directory with only ignored files', async () => {
       fs.writeFileSync(path.join(tmpDir, '.DS_Store'), 'junk');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -694,6 +725,7 @@ describe('syncDirectoryMetadata', () => {
         'data',
       );
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});
@@ -720,6 +752,7 @@ describe('syncDirectoryMetadata', () => {
       fs.writeFileSync(path.join(tmpDir, 'dir1', 'file.txt'), 'data1');
       fs.writeFileSync(path.join(tmpDir, 'dir2', 'file.txt'), 'data2');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = new S3Client({});

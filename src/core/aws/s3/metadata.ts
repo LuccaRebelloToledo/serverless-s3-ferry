@@ -51,38 +51,41 @@ export async function syncDirectoryMetadata(
   }
 
   const fileMap = new Map<string, FileToSync>();
-  const ignored = new Set<string>(['.DS_Store']);
-  const files = getLocalFiles(localDir, log);
+  const ignoredNames = new Set<string>(['.DS_Store']);
+  const stageIgnoredFiles = new Set<string>();
 
-  for (const param of params) {
-    const glob = Object.keys(param)[0];
-    const matches = minimatch.match(
-      files,
-      `${path.resolve(localDir)}${path.sep}${glob}`,
-      { matchBase: true },
-    );
+  for await (const localFile of getLocalFiles(localDir, log)) {
+    if (ignoredNames.has(path.basename(localFile))) continue;
 
-    for (const match of matches) {
-      if (ignored.has(match)) continue;
-      const matchParams = extractMetaParams(param);
-      if (
-        matchParams['OnlyForStage'] &&
-        matchParams['OnlyForStage'] !== stage
-      ) {
-        ignored.add(match);
-        fileMap.delete(match);
-        continue;
+    for (const param of params) {
+      if (stageIgnoredFiles.has(localFile)) break;
+
+      const glob = Object.keys(param)[0];
+      const fullGlob = `${path.resolve(localDir)}${path.sep}${glob}`;
+
+      if (minimatch(localFile, fullGlob)) {
+        const matchParams = extractMetaParams(param);
+        if (
+          matchParams['OnlyForStage'] &&
+          matchParams['OnlyForStage'] !== stage
+        ) {
+          stageIgnoredFiles.add(localFile);
+          fileMap.delete(localFile);
+          break;
+        }
+        delete matchParams['OnlyForStage'];
+
+        fileMap.set(localFile, { name: localFile, params: matchParams });
       }
-      delete matchParams['OnlyForStage'];
-      fileMap.set(match, { name: match, params: matchParams });
     }
   }
 
   const filesToSync = Array.from(fileMap.values());
-
   const bucketDir = `${bucket}${normalizedPrefix === '' ? '' : normalizedPrefix}/`;
 
   const limit = pLimit(DEFAULT_MAX_CONCURRENCY);
+  let completed = 0;
+
   await Promise.all(
     filesToSync.map((file) =>
       limit(async () => {
@@ -116,12 +119,20 @@ export async function syncDirectoryMetadata(
           contentType,
           extraParams: file.params,
         });
+
+        completed++;
+        const percent =
+          filesToSync.length > 0
+            ? Math.round((completed / filesToSync.length) * 100)
+            : 0;
+        progress.update(
+          `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
+        );
       }),
     ),
   );
 
-  const percent = filesToSync.length > 0 ? 100 : 0;
-  progress.update(
-    `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
-  );
+  if (filesToSync.length === 0) {
+    progress.update(`${localDir}: sync bucket metadata to ${bucketDir} (0%)`);
+  }
 }
