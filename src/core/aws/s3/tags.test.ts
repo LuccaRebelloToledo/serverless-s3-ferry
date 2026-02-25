@@ -77,6 +77,22 @@ describe('updateBucketTags', () => {
     ]);
   });
 
+  it('handles undefined TagSet in response', async () => {
+    s3Mock.on(GetBucketTaggingCommand).resolves({
+      TagSet: undefined,
+    });
+    s3Mock.on(PutBucketTaggingCommand).resolves({});
+
+    const client = new S3Client({});
+    await updateBucketTags(client, TEST_BUCKET, [{ Key: 'new', Value: 'tag' }]);
+
+    const putCall = s3Mock.commandCalls(PutBucketTaggingCommand)[0];
+    if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
+    expect(putCall.args[0].input.Tagging?.TagSet).toEqual([
+      { Key: 'new', Value: 'tag' },
+    ]);
+  });
+
   it('re-throws other errors', async () => {
     s3Mock.on(GetBucketTaggingCommand).rejects(new Error('AccessDenied'));
 

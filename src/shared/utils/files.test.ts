@@ -50,6 +50,32 @@ describe('getLocalFiles', () => {
     );
   });
 
+  it('skips files without read permission and logs error', () => {
+    fs.writeFileSync(path.join(tmpDir, 'readable.txt'), 'ok');
+    fs.writeFileSync(path.join(tmpDir, 'unreadable.txt'), 'no');
+
+    const accessSyncOriginal = fs.accessSync;
+    const spy = vi.spyOn(fs, 'accessSync').mockImplementation((p, mode) => {
+      if (String(p).includes('unreadable.txt')) {
+        throw new Error('EACCES');
+      }
+      return accessSyncOriginal.call(fs, p, mode);
+    });
+
+    try {
+      const log = { error: vi.fn(), warning: vi.fn() };
+      const files = getLocalFiles(tmpDir, log);
+
+      expect(files).toHaveLength(1);
+      expect(files[0]).toContain('readable.txt');
+      expect(log.error).toHaveBeenCalledWith(
+        expect.stringContaining('unreadable.txt'),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('returns empty array for empty directory', () => {
     const files = getLocalFiles(tmpDir);
     expect(files).toEqual([]);

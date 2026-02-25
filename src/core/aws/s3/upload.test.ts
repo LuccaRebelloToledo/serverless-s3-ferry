@@ -254,6 +254,90 @@ describe('uploadDirectory', () => {
     expect(deleteCall1.args[0].input.Delete?.Objects).toHaveLength(500);
   });
 
+  it('includes file when OnlyForStage matches current stage', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [
+        {
+          glob: '*.html',
+          params: { CacheControl: 'max-age=300', OnlyForStage: 'prod' },
+        },
+      ],
+      stage: 'prod',
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    // OnlyForStage should be stripped from the params sent to S3
+    expect(
+      (putCall.args[0].input as unknown as Record<string, unknown>)[
+        'OnlyForStage'
+      ],
+    ).toBeUndefined();
+    expect(putCall.args[0].input.CacheControl).toBe('max-age=300');
+  });
+
+  it('skips file when OnlyForStage does not match current stage', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [{ glob: '*.html', params: { OnlyForStage: 'prod' } }],
+      stage: 'dev',
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
+  });
+
+  it('skips file when OnlyForStage is set but stage is undefined', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [{ glob: '*.html', params: { OnlyForStage: 'prod' } }],
+      stage: undefined,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
+  });
+
   it('applies default content type for unknown extensions', async () => {
     fs.writeFileSync(path.join(tmpDir, 'data.unknownext123'), 'stuff');
 
@@ -277,5 +361,147 @@ describe('uploadDirectory', () => {
     const putCall = putCalls[0];
     if (!putCall) throw new Error('Expected PutObjectCommand call');
     expect(putCall.args[0].input.ContentType).toBe('text/plain');
+  });
+
+  it('falls back to application/octet-stream when mime and defaultContentType are both null', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'data.unknownext123'), 'stuff');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.ContentType).toBe('application/octet-stream');
+  });
+
+  it('does not delete remote keys that exist locally when deleteRemoved is true', async () => {
+    const content = 'hello';
+    fs.writeFileSync(path.join(tmpDir, 'exists.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [
+        { Key: 'exists.txt', ETag: '"different"' },
+        { Key: 'orphan.txt', ETag: '"abc"' },
+      ],
+    });
+    s3Mock.on(PutObjectCommand).resolves({});
+    s3Mock.on(DeleteObjectsCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: true,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
+    expect(deleteCalls).toHaveLength(1);
+    const deleteCall = deleteCalls[0];
+    if (!deleteCall) throw new Error('Expected DeleteObjectsCommand call');
+    // Only orphan.txt should be deleted, not exists.txt
+    expect(deleteCall.args[0].input.Delete?.Objects).toEqual([
+      { Key: 'orphan.txt' },
+    ]);
+  });
+
+  it('applies matching params without OnlyForStage', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [{ glob: '*.html', params: { CacheControl: 'max-age=300' } }],
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.CacheControl).toBe('max-age=300');
+  });
+
+  it('applies params only to matching files and ignores non-matching globs', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'style.css'), 'body{}');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [{ glob: '*.html', params: { CacheControl: 'max-age=300' } }],
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    // CacheControl should NOT be applied since style.css doesn't match *.html
+    expect(putCall.args[0].input.CacheControl).toBeUndefined();
+  });
+
+  it('preserves prior OnlyForStage via || fallback when later param has no OnlyForStage', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [
+        { glob: '*.html', params: { OnlyForStage: 'prod' } },
+        { glob: '**/*', params: { CacheControl: 'max-age=60' } },
+      ],
+      stage: 'prod',
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.CacheControl).toBe('max-age=60');
   });
 });
