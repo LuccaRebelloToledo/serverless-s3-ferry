@@ -24,7 +24,7 @@ export interface SyncMetadataOptions {
   acl: ObjectCannedACL;
   defaultContentType?: string;
   params: ParamEntry[];
-  env?: string;
+  stage?: string;
   progress: Plugin.Progress;
   log?: ErrorLogger;
 }
@@ -40,7 +40,7 @@ export async function syncDirectoryMetadata(
     acl,
     defaultContentType,
     params,
-    env,
+    stage,
     progress,
     log,
   } = options;
@@ -65,12 +65,15 @@ export async function syncDirectoryMetadata(
     for (const match of matches) {
       if (ignored.has(match)) continue;
       const matchParams = extractMetaParams(param);
-      if (matchParams['OnlyForEnv'] && matchParams['OnlyForEnv'] !== env) {
+      if (
+        matchParams['OnlyForStage'] &&
+        matchParams['OnlyForStage'] !== stage
+      ) {
         ignored.add(match);
         fileMap.delete(match);
         continue;
       }
-      delete matchParams['OnlyForEnv'];
+      delete matchParams['OnlyForStage'];
       fileMap.set(match, { name: match, params: matchParams });
     }
   }

@@ -127,8 +127,8 @@ describe('syncDirectoryMetadata', () => {
     });
   });
 
-  describe('environment filtering', () => {
-    it('includes files matching current environment', async () => {
+  describe('stage filtering', () => {
+    it('includes files matching current stage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'prod.js'), 'code');
       fs.writeFileSync(path.join(tmpDir, 'all.js'), 'code');
 
@@ -141,8 +141,11 @@ describe('syncDirectoryMetadata', () => {
         bucket: TEST_BUCKET,
         bucketPrefix: '',
         acl: 'private',
-        env: 'production',
-        params: [{ 'prod.js': { OnlyForEnv: 'production' } }, { 'all.js': {} }],
+        stage: 'production',
+        params: [
+          { 'prod.js': { OnlyForStage: 'production' } },
+          { 'all.js': {} },
+        ],
         progress: mockProgress(),
       });
 
@@ -152,7 +155,7 @@ describe('syncDirectoryMetadata', () => {
       expect(keys).toEqual(['all.js', 'prod.js']);
     });
 
-    it('excludes files not matching current environment', async () => {
+    it('excludes files not matching current stage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'dev.js'), 'code');
       fs.writeFileSync(path.join(tmpDir, 'prod.js'), 'code');
 
@@ -165,10 +168,10 @@ describe('syncDirectoryMetadata', () => {
         bucket: TEST_BUCKET,
         bucketPrefix: '',
         acl: 'private',
-        env: 'production',
+        stage: 'production',
         params: [
-          { 'dev.js': { OnlyForEnv: 'development' } },
-          { 'prod.js': { OnlyForEnv: 'production' } },
+          { 'dev.js': { OnlyForStage: 'development' } },
+          { 'prod.js': { OnlyForStage: 'production' } },
         ],
         progress: mockProgress(),
       });
@@ -180,7 +183,7 @@ describe('syncDirectoryMetadata', () => {
       expect(call.args[0].input.Key).toBe('prod.js');
     });
 
-    it('handles undefined environment', async () => {
+    it('handles undefined stage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.js'), 'code');
 
       s3Mock.on(CopyObjectCommand).resolves({});
@@ -192,7 +195,7 @@ describe('syncDirectoryMetadata', () => {
         bucket: TEST_BUCKET,
         bucketPrefix: '',
         acl: 'private',
-        params: [{ 'file.js': { OnlyForEnv: 'production' } }],
+        params: [{ 'file.js': { OnlyForStage: 'production' } }],
         progress: mockProgress(),
       });
 
@@ -200,7 +203,7 @@ describe('syncDirectoryMetadata', () => {
       expect(calls).toHaveLength(0);
     });
 
-    it('removes OnlyForEnv from final parameters', async () => {
+    it('removes OnlyForStage from final parameters', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.js'), 'code');
 
       s3Mock.on(CopyObjectCommand).resolves({});
@@ -212,11 +215,11 @@ describe('syncDirectoryMetadata', () => {
         bucket: TEST_BUCKET,
         bucketPrefix: '',
         acl: 'private',
-        env: 'production',
+        stage: 'production',
         params: [
           {
             'file.js': {
-              OnlyForEnv: 'production',
+              OnlyForStage: 'production',
               CacheControl: 'max-age=300',
             },
           },
@@ -230,7 +233,7 @@ describe('syncDirectoryMetadata', () => {
       expect(call.args[0].input.CacheControl).toBe('max-age=300');
     });
 
-    it('skips file excluded by OnlyForEnv in first pattern but matches later pattern', async () => {
+    it('skips file excluded by OnlyForStage in first pattern but matches later pattern', async () => {
       fs.writeFileSync(path.join(tmpDir, 'config.js'), 'code');
 
       s3Mock.on(CopyObjectCommand).resolves({});
@@ -242,16 +245,16 @@ describe('syncDirectoryMetadata', () => {
         bucket: TEST_BUCKET,
         bucketPrefix: '',
         acl: 'private',
-        env: 'development',
+        stage: 'development',
         params: [
-          { '*.js': { OnlyForEnv: 'production' } },
+          { '*.js': { OnlyForStage: 'production' } },
           { 'config.js': { CacheControl: 'max-age=3600' } },
         ],
         progress: mockProgress(),
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      // File matches first pattern with OnlyForEnv=production, but env is development
+      // File matches first pattern with OnlyForStage=production, but env is development
       // So it's ignored and won't match the second pattern either
       expect(calls).toHaveLength(0);
     });

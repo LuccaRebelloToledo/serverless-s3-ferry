@@ -231,16 +231,16 @@ custom:
 # ...
 ```
 
-### Environment-scoped file params
+### Stage-scoped file params
 
-Use the `OnlyForEnv` param to upload a file only when a specific stage is active:
+Use the `OnlyForStage` param to upload a file only when a specific stage is active:
 
 ```yaml
-# Only upload this file when STAGE=production
+# Only upload this file when --stage production
 params:
   - "*.production.js":
       CacheControl: 'max-age=31536000'
-      OnlyForEnv: production
+      OnlyForStage: production
 ```
 
 ## Contributing

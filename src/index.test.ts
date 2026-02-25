@@ -444,7 +444,7 @@ describe('ServerlessS3Ferry', () => {
       expect(copyCall.args[0].input.CacheControl).toBe('max-age=300');
     });
 
-    it('ignores files with mismatched OnlyForEnv', async () => {
+    it('ignores files with mismatched OnlyForStage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
 
       s3Mock.on(CopyObjectCommand).resolves({});
@@ -457,14 +457,17 @@ describe('ServerlessS3Ferry', () => {
               localDir: '.',
               params: [
                 {
-                  '*.html': { CacheControl: 'max-age=300', OnlyForEnv: 'prod' },
+                  '*.html': {
+                    CacheControl: 'max-age=300',
+                    OnlyForStage: 'prod',
+                  },
                 },
               ],
             },
           ],
           tmpDir,
         ),
-        { env: 'dev' } as S3FerryOptions,
+        { stage: 'dev' } as S3FerryOptions,
         mockLogging(),
       );
 

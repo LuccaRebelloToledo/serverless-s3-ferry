@@ -281,7 +281,7 @@ class ServerlessS3Ferry implements Plugin {
             maxConcurrency: DEFAULT_MAX_CONCURRENCY,
             progress: bucketProgress,
             servicePath: this.servicePath,
-            env: this.options.env,
+            stage: this.options.stage,
             log: this.log,
           });
         } finally {
@@ -383,7 +383,7 @@ class ServerlessS3Ferry implements Plugin {
             acl: config.acl,
             defaultContentType: config.defaultContentType,
             params: config.params,
-            env: this.options.env,
+            stage: this.options.stage,
             progress: bucketProgress,
             log: this.log,
           });
