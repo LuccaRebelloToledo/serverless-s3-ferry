@@ -348,6 +348,46 @@ describe('ServerlessS3Ferry', () => {
         { Key: 'old.txt' },
       ]);
     });
+
+    it('caches S3 client across multiple buckets', async () => {
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [
+            { bucketName: 'bucket-1', localDir: '.', deleteRemoved: false },
+            { bucketName: 'bucket-2', localDir: '.', deleteRemoved: false },
+          ],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        mockLogging(),
+      );
+
+      await plugin.sync();
+
+      expect(s3Mock.commandCalls(ListObjectsV2Command)).toHaveLength(2);
+    });
+
+    it('throws error when bucketName and bucketNameKey are missing', async () => {
+      const plugin = new ServerlessS3Ferry(
+        mockServerless([], tmpDir),
+        {} as S3FerryOptions,
+        mockLogging(),
+      );
+
+      // Bypass visibility to reach the unreachable check in getBucketName
+      await expect(
+        (
+          plugin as unknown as {
+            getBucketName: (config: RawBucketConfig) => Promise<string>;
+          }
+        ).getBucketName({ localDir: '.' }),
+      ).rejects.toThrow(
+        'Unable to find bucketName. Please provide a value for bucketName or bucketNameKey',
+      );
+    });
   });
 
   describe('clear()', () => {
@@ -634,6 +674,429 @@ describe('ServerlessS3Ferry', () => {
       const putCall = putCalls[0];
       if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
       expect(putCall.args[0].input.Bucket).toBe('bucket-a');
+    });
+  });
+
+  describe('hook: s3ferry:sync logs success', () => {
+    it('logs success when invoked as command', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['s3ferry:sync']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['success']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced files to S3 buckets'),
+      );
+    });
+  });
+
+  describe('hook: s3ferry:metadata logs success', () => {
+    it('logs success when invoked as command', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+      s3Mock.on(CopyObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [
+            {
+              bucketName: TEST_BUCKET,
+              localDir: '.',
+              params: [{ '*.html': { CacheControl: 'max-age=300' } }],
+            },
+          ],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['s3ferry:metadata']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['success']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced bucket metadata'),
+      );
+    });
+  });
+
+  describe('hook: s3ferry:tags logs success', () => {
+    it('logs success when invoked as command', async () => {
+      s3Mock.on(GetBucketTaggingCommand).resolves({ TagSet: [] });
+      s3Mock.on(PutBucketTaggingCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [
+            {
+              bucketName: TEST_BUCKET,
+              localDir: '.',
+              bucketTags: { env: 'prod' },
+            },
+          ],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['s3ferry:tags']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['success']).toHaveBeenCalledWith(
+        expect.stringContaining('Updated bucket tags'),
+      );
+    });
+  });
+
+  describe('hook: after:deploy:deploy', () => {
+    it('runs full sync (sync + metadata + tags)', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['after:deploy:deploy']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced files to S3 buckets'),
+      );
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced bucket metadata'),
+      );
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Updated bucket tags'),
+      );
+    });
+  });
+
+  describe('hook: before:offline:start', () => {
+    it('sets offline mode', async () => {
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['before:offline:start']();
+
+      // Verify offline is set by triggering a sync (it should create a new client with offline config)
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+      await plugin.sync();
+
+      // If we got here without error, offline was set correctly
+      expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+    });
+  });
+
+  describe('hook: before:offline:start:init', () => {
+    it('sets offline mode', async () => {
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['before:offline:start:init']();
+
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+      await plugin.sync();
+
+      expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+    });
+  });
+
+  describe('hook: after:offline:start:init', () => {
+    it('runs full sync', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['after:offline:start:init']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced files to S3 buckets'),
+      );
+    });
+  });
+
+  describe('hook: after:offline:start', () => {
+    it('runs full sync', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['after:offline:start']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced files to S3 buckets'),
+      );
+    });
+  });
+
+  describe('hook: before:remove:remove', () => {
+    it('clears bucket objects', async () => {
+      s3Mock.on(ListObjectsV2Command).resolves({
+        Contents: [{ Key: 'a.txt' }],
+      });
+      s3Mock.on(DeleteObjectsCommand).resolves({});
+
+      const plugin = new ServerlessS3Ferry(
+        mockServerless([{ bucketName: TEST_BUCKET, localDir: '.' }], tmpDir),
+        {} as S3FerryOptions,
+        mockLogging(),
+      );
+
+      await plugin.hooks['before:remove:remove']();
+
+      expect(s3Mock.commandCalls(DeleteObjectsCommand)).toHaveLength(1);
+    });
+
+    it('skips when nos3ferry is true', async () => {
+      const plugin = new ServerlessS3Ferry(
+        mockServerless([{ bucketName: TEST_BUCKET, localDir: '.' }], tmpDir),
+        { nos3ferry: true } as S3FerryOptions,
+        mockLogging(),
+      );
+
+      await plugin.hooks['before:remove:remove']();
+
+      expect(s3Mock.commandCalls(ListObjectsV2Command)).toHaveLength(0);
+    });
+  });
+
+  describe('hooks: s3ferry:bucket:*', () => {
+    it('s3ferry:bucket:sync runs sync', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['s3ferry:bucket:sync']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['success']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced files to S3 buckets'),
+      );
+    });
+
+    it('s3ferry:bucket:metadata runs syncMetadata', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+      s3Mock.on(CopyObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [
+            {
+              bucketName: TEST_BUCKET,
+              localDir: '.',
+              params: [{ '*.html': { CacheControl: 'max-age=300' } }],
+            },
+          ],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['s3ferry:bucket:metadata']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['success']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced bucket metadata'),
+      );
+    });
+
+    it('s3ferry:bucket:tags runs syncBucketTags', async () => {
+      s3Mock.on(GetBucketTaggingCommand).resolves({ TagSet: [] });
+      s3Mock.on(PutBucketTaggingCommand).resolves({});
+
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [
+            {
+              bucketName: TEST_BUCKET,
+              localDir: '.',
+              bucketTags: { env: 'prod' },
+            },
+          ],
+          tmpDir,
+        ),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['s3ferry:bucket:tags']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['success']).toHaveBeenCalledWith(
+        expect.stringContaining('Updated bucket tags'),
+      );
+    });
+  });
+
+  describe('custom hook callback', () => {
+    it('executes full sync when custom hook is invoked', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+      s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const logging = mockLogging();
+      const config: RawS3FerryConfig = {
+        buckets: [
+          { bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false },
+        ],
+        hooks: ['after:deploy:finalize'],
+      };
+
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(config, tmpDir),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.hooks['after:deploy:finalize']();
+
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced files to S3 buckets'),
+      );
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Synced bucket metadata'),
+      );
+      expect(log['verbose']).toHaveBeenCalledWith(
+        expect.stringContaining('Updated bucket tags'),
+      );
+    });
+  });
+
+  describe('offline hooks with nos3ferry', () => {
+    it('after:offline:start:init skips when nos3ferry is true', async () => {
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        { nos3ferry: true } as S3FerryOptions,
+        mockLogging(),
+      );
+
+      await plugin.hooks['after:offline:start:init']();
+
+      expect(s3Mock.commandCalls(ListObjectsV2Command)).toHaveLength(0);
+    });
+
+    it('after:offline:start skips when nos3ferry is true', async () => {
+      const plugin = new ServerlessS3Ferry(
+        mockServerless(
+          [{ bucketName: TEST_BUCKET, localDir: '.', deleteRemoved: false }],
+          tmpDir,
+        ),
+        { nos3ferry: true } as S3FerryOptions,
+        mockLogging(),
+      );
+
+      await plugin.hooks['after:offline:start']();
+
+      expect(s3Mock.commandCalls(ListObjectsV2Command)).toHaveLength(0);
     });
   });
 

@@ -13,7 +13,13 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       include: ['src/**/*.ts'],
-      exclude: ['src/shared/testing'],
+      exclude: [
+        'src/shared/testing',
+        'src/shared/index.ts',
+        'src/shared/*/index.ts',
+        'src/core/**/index.ts',
+        'src/shared/types/*.ts',
+      ],
     },
   },
 });

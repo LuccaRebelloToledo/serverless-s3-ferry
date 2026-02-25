@@ -58,7 +58,9 @@ function resolveS3Params(
   for (const param of params) {
     if (minimatch(localFile, `${path.resolve(localDir)}/${param.glob}`)) {
       Object.assign(s3Params, param.params);
-      onlyForStage = s3Params['OnlyForStage'] || onlyForStage;
+      if (s3Params['OnlyForStage']) {
+        onlyForStage = s3Params['OnlyForStage'];
+      }
     }
   }
 

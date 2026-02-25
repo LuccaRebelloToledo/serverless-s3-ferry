@@ -47,7 +47,7 @@ class ServerlessS3Ferry implements Plugin {
     logging: Plugin.Logging,
   ) {
     this.serverless = serverless;
-    this.options = options || {};
+    this.options = options;
     this.log = logging.log;
     this.progress = logging.progress;
     this.servicePath = this.serverless.service.serverless.config.servicePath;
@@ -214,10 +214,12 @@ class ServerlessS3Ferry implements Plugin {
     if (config.bucketName) {
       return config.bucketName;
     }
+
     if (config.bucketNameKey) {
       const provider = this.getProvider();
       return resolveStackOutput(provider, config.bucketNameKey);
     }
+
     throw new ConfigValidationError(
       'Unable to find bucketName. Please provide a value for bucketName or bucketNameKey',
     );

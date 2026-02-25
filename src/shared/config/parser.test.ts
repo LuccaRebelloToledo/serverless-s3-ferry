@@ -100,6 +100,16 @@ describe('buildParamMatchers', () => {
       { glob: '*.js', params: { ContentEncoding: 'gzip' } },
     ]);
   });
+
+  it('filters out entries with empty object (no glob key)', () => {
+    const result = buildParamMatchers([
+      { '*.html': { CacheControl: 'max-age=300' } },
+      {} as Record<string, never>,
+    ]);
+    expect(result).toEqual([
+      { glob: '*.html', params: { CacheControl: 'max-age=300' } },
+    ]);
+  });
 });
 
 describe('getNoSync', () => {
