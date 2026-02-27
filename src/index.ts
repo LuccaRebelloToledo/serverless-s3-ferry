@@ -1,37 +1,30 @@
-import child_process from 'node:child_process';
-import path from 'node:path';
 import { env } from 'node:process';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { resolveStackOutput } from '@core/aws/cloudformation';
-import {
-  createS3Client,
-  deleteDirectory,
-  syncDirectoryMetadata,
-  updateBucketTags,
-  uploadDirectory,
-} from '@core/aws/s3';
+import { createS3Client } from '@core/aws/s3';
+import { SyncOrchestrator } from '@core/sync-orchestrator';
 import {
   type AwsProviderExtended,
   type BucketSyncConfig,
-  buildParamMatchers,
   ConfigValidationError,
-  DEFAULT_MAX_CONCURRENCY,
   DEFAULT_OFFLINE_VALUE,
-  DEFAULT_PRE_COMMAND_TIMEOUT,
   getBucketConfigs,
   getCustomHooks,
   getEndpoint,
   getNoSync,
   OFFLINE_ENV_VAR,
   type Plugin,
-  parseBucketConfig,
   type RawBucketConfig,
   type RawS3FerryConfig,
   type S3FerryOptions,
   type Serverless,
-  type Tag,
 } from '@shared';
 
+/**
+ * ServerlessS3Ferry Plugin
+ *
+ * A Serverless Framework plugin for syncing local directories to S3 buckets.
+ */
 class ServerlessS3Ferry implements Plugin {
   private readonly serverless: Serverless;
   private readonly options: S3FerryOptions;
@@ -40,6 +33,7 @@ class ServerlessS3Ferry implements Plugin {
   private readonly servicePath: string;
   private offline: boolean;
   private _s3Client: S3Client | null = null;
+  private _orchestrator: SyncOrchestrator | null = null;
 
   public commands: Plugin.Commands;
   public hooks: Plugin.Hooks;
@@ -57,7 +51,15 @@ class ServerlessS3Ferry implements Plugin {
     this.offline =
       String(this.options.offline).toUpperCase() === DEFAULT_OFFLINE_VALUE;
 
-    this.commands = {
+    this.commands = this.defineCommands();
+    this.hooks = this.defineHooks();
+  }
+
+  /**
+   * Defines the plugin commands.
+   */
+  private defineCommands(): Plugin.Commands {
+    return {
       s3ferry: {
         usage: 'Sync directories and S3 prefixes',
         lifecycleEvents: ['sync', 'metadata', 'tags'],
@@ -112,7 +114,12 @@ class ServerlessS3Ferry implements Plugin {
         },
       },
     };
+  }
 
+  /**
+   * Defines the plugin hooks.
+   */
+  private defineHooks(): Plugin.Hooks {
     const noSync = this.shouldSkipSync();
     const customHooks = getCustomHooks(this.getS3FerryConfig());
     const customHookEntries = customHooks.reduce(
@@ -125,7 +132,7 @@ class ServerlessS3Ferry implements Plugin {
       {},
     );
 
-    this.hooks = {
+    return {
       'after:deploy:deploy': async () => {
         if (noSync) return;
         await this.performFullSync();
@@ -179,6 +186,7 @@ class ServerlessS3Ferry implements Plugin {
   private setOffline(): void {
     this.offline = true;
     this._s3Client = null;
+    this._orchestrator = null;
   }
 
   private isOffline(): boolean {
@@ -199,7 +207,7 @@ class ServerlessS3Ferry implements Plugin {
     return getNoSync(this.getS3FerryConfig(), this.options.nos3ferry);
   }
 
-  private getS3Client() {
+  private getS3Client(): S3Client {
     if (!this._s3Client) {
       const endpoint = getEndpoint(this.getS3FerryConfig());
       const provider = this.getProvider();
@@ -210,6 +218,20 @@ class ServerlessS3Ferry implements Plugin {
       });
     }
     return this._s3Client;
+  }
+
+  private getOrchestrator(): SyncOrchestrator {
+    if (!this._orchestrator) {
+      this._orchestrator = new SyncOrchestrator({
+        s3Client: this.getS3Client(),
+        servicePath: this.servicePath,
+        options: this.options,
+        log: this.log,
+        progress: this.progress,
+        getBucketName: this.getBucketName.bind(this),
+      });
+    }
+    return this._orchestrator;
   }
 
   private async getBucketName(
@@ -233,25 +255,6 @@ class ServerlessS3Ferry implements Plugin {
     return getBucketConfigs(this.getS3FerryConfig());
   }
 
-  private runPreCommand(
-    command: string,
-    bucketProgress: Plugin.Progress,
-  ): void {
-    this.log.verbose(`Running pre-command: ${command}`);
-    bucketProgress.update(`running pre-command...`);
-
-    try {
-      child_process.execSync(command, {
-        stdio: 'inherit',
-        timeout: DEFAULT_PRE_COMMAND_TIMEOUT,
-        cwd: this.servicePath,
-      });
-    } catch (error) {
-      this.log.error(`Pre-command failed: ${command}`);
-      throw error;
-    }
-  }
-
   async sync(invokedAsCommand?: boolean): Promise<void> {
     const rawBuckets = this.getRawBucketConfigs();
     if (!rawBuckets) {
@@ -261,65 +264,7 @@ class ServerlessS3Ferry implements Plugin {
       return;
     }
 
-    const taskProgress = this.progress.create({
-      message: this.options.bucket
-        ? `Syncing directory attached to S3 bucket ${this.options.bucket}`
-        : 'Syncing directories to S3 buckets',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
-        if (!config.enabled) return;
-
-        const bucketName = await this.getBucketName(config);
-        if (this.options.bucket && bucketName !== this.options.bucket) {
-          return;
-        }
-
-        const localDir = path.join(this.servicePath, config.localDir);
-
-        const bucketProgress = this.progress.create({
-          message: `${localDir}: sync with bucket ${bucketName} (0%)`,
-        });
-
-        try {
-          if (config.preCommand) {
-            this.runPreCommand(config.preCommand, bucketProgress);
-          }
-
-          const paramMatchers = buildParamMatchers(config.params);
-
-          await uploadDirectory({
-            s3Client: this.getS3Client(),
-            localDir,
-            bucket: bucketName,
-            prefix: config.bucketPrefix,
-            acl: config.acl,
-            deleteRemoved: config.deleteRemoved,
-            defaultContentType: config.defaultContentType,
-            params: paramMatchers,
-            maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-            progress: bucketProgress,
-            servicePath: this.servicePath,
-            stage: this.options.stage,
-            log: this.log,
-          });
-        } finally {
-          bucketProgress.remove();
-        }
-      });
-
-      await Promise.all(promises);
-
-      if (invokedAsCommand) {
-        this.log.success('Synced files to S3 buckets');
-      } else {
-        this.log.verbose('Synced files to S3 buckets');
-      }
-    } finally {
-      taskProgress.remove();
-    }
+    await this.getOrchestrator().sync(rawBuckets, invokedAsCommand);
   }
 
   async clear(): Promise<void> {
@@ -331,38 +276,7 @@ class ServerlessS3Ferry implements Plugin {
       return;
     }
 
-    const taskProgress = this.progress.create({
-      message: 'Removing objects from S3 buckets',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
-        if (!config.enabled) return;
-
-        const bucketName = await this.getBucketName(config);
-
-        const bucketProgress = this.progress.create({
-          message: `${bucketName}: removing files with prefix ${config.bucketPrefix} (0%)`,
-        });
-
-        try {
-          await deleteDirectory({
-            s3Client: this.getS3Client(),
-            bucket: bucketName,
-            prefix: config.bucketPrefix,
-            progress: bucketProgress,
-          });
-        } finally {
-          bucketProgress.remove();
-        }
-      });
-
-      await Promise.all(promises);
-      this.log.verbose('Removed objects from S3 buckets');
-    } finally {
-      taskProgress.remove();
-    }
+    await this.getOrchestrator().clear(rawBuckets);
   }
 
   async syncMetadata(invokedAsCommand?: boolean): Promise<void> {
@@ -374,55 +288,7 @@ class ServerlessS3Ferry implements Plugin {
       return;
     }
 
-    const taskProgress = this.progress.create({
-      message: 'Syncing bucket metadata',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
-
-        if (config.params.length === 0) return;
-
-        const bucketName = await this.getBucketName(config);
-        if (this.options?.bucket && bucketName !== this.options.bucket) {
-          return;
-        }
-
-        const localDir = path.join(this.servicePath, config.localDir);
-
-        const bucketProgress = this.progress.create({
-          message: `${localDir}: sync bucket metadata to ${bucketName} (0%)`,
-        });
-
-        try {
-          await syncDirectoryMetadata({
-            s3Client: this.getS3Client(),
-            localDir,
-            bucket: bucketName,
-            bucketPrefix: config.bucketPrefix,
-            acl: config.acl,
-            defaultContentType: config.defaultContentType,
-            params: config.params,
-            stage: this.options.stage,
-            progress: bucketProgress,
-            log: this.log,
-          });
-        } finally {
-          bucketProgress.remove();
-        }
-      });
-
-      await Promise.all(promises);
-
-      if (invokedAsCommand) {
-        this.log.success('Synced bucket metadata');
-      } else {
-        this.log.verbose('Synced bucket metadata');
-      }
-    } finally {
-      taskProgress.remove();
-    }
+    await this.getOrchestrator().syncMetadata(rawBuckets, invokedAsCommand);
   }
 
   async syncBucketTags(invokedAsCommand?: boolean): Promise<void> {
@@ -434,51 +300,7 @@ class ServerlessS3Ferry implements Plugin {
       return;
     }
 
-    const taskProgress = this.progress.create({
-      message: 'Updating bucket tags',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
-
-        if (!config.bucketTags) {
-          return;
-        }
-
-        const tagsToUpdate: Tag[] = Object.keys(config.bucketTags)
-          .map((tagKey) => ({
-            Key: tagKey,
-            Value: config.bucketTags?.[tagKey],
-          }))
-          .filter((tag): tag is Tag => !!tag.Value);
-
-        const bucketName = await this.getBucketName(config);
-        if (this.options?.bucket && bucketName !== this.options.bucket) {
-          return;
-        }
-
-        const bucketProgress = this.progress.create({
-          message: `${bucketName}: sync bucket tags`,
-        });
-
-        try {
-          await updateBucketTags(this.getS3Client(), bucketName, tagsToUpdate);
-        } finally {
-          bucketProgress.remove();
-        }
-      });
-
-      await Promise.all(promises);
-
-      if (invokedAsCommand) {
-        this.log.success('Updated bucket tags');
-      } else {
-        this.log.verbose('Updated bucket tags');
-      }
-    } finally {
-      taskProgress.remove();
-    }
+    await this.getOrchestrator().syncBucketTags(rawBuckets, invokedAsCommand);
   }
 }
 

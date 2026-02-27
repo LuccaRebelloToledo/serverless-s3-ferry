@@ -9,6 +9,9 @@ export interface DeleteDirOptions {
   progress: Plugin.Progress;
 }
 
+/**
+ * Deletes S3 objects in batches of up to 1000 keys (AWS limit).
+ */
 export async function deleteObjectsByKeys(
   s3Client: S3Client,
   bucket: string,
@@ -32,6 +35,9 @@ export async function deleteObjectsByKeys(
   }
 }
 
+/**
+ * Lists and deletes all objects in an S3 bucket that match the specified prefix.
+ */
 export async function deleteDirectory(
   options: DeleteDirOptions,
 ): Promise<void> {

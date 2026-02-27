@@ -38,12 +38,16 @@ interface FileProcessEntry {
   s3Params: S3Params;
 }
 
-function resolveS3Params(
-  localFile: string,
-  localDir: string,
-  params?: ParamMatcher[],
-  stage?: string,
-): S3Params | null {
+interface ResolveS3ParamsOptions {
+  localFile: string;
+  localDir: string;
+  params?: ParamMatcher[];
+  stage?: string;
+}
+
+function resolveS3Params(options: ResolveS3ParamsOptions): S3Params | null {
+  const { localFile, localDir, params, stage } = options;
+
   if (!params || params.length === 0) {
     return {};
   }
@@ -69,6 +73,96 @@ function resolveS3Params(
   return s3Params;
 }
 
+interface GetRemoteObjectsMapOptions {
+  s3Client: S3Client;
+  bucket: string;
+  prefix: string;
+}
+
+/**
+ * Builds a map of remote objects by key for quick lookup.
+ */
+async function getRemoteObjectsMap(
+  options: GetRemoteObjectsMapOptions,
+): Promise<Map<string, S3Object>> {
+  const { s3Client, bucket, prefix } = options;
+  const remoteByKey = new Map<string, S3Object>();
+  for await (const obj of listAllObjects(s3Client, bucket, prefix)) {
+    remoteByKey.set(obj.Key, obj);
+  }
+  return remoteByKey;
+}
+
+interface GetFilesToProcessOptions {
+  localDir: string;
+  prefix: string;
+  params?: ParamMatcher[];
+  stage?: string;
+  log?: ErrorLogger;
+}
+
+interface FilesToProcessResult {
+  files: FileProcessEntry[];
+  localKeys: Set<string>;
+}
+
+/**
+ * Lists local files and maps them to S3 keys and parameters.
+ */
+async function getFilesToProcess(
+  options: GetFilesToProcessOptions,
+): Promise<FilesToProcessResult> {
+  const { localDir, prefix, params, stage, log } = options;
+  const files: FileProcessEntry[] = [];
+  const localKeys = new Set<string>();
+
+  for await (const localFile of getLocalFiles(localDir, log)) {
+    const relativePath = path.relative(localDir, localFile);
+    const s3Key = prefix
+      ? `${prefix}${toS3Path(relativePath)}`
+      : toS3Path(relativePath);
+
+    localKeys.add(s3Key);
+
+    const s3Params = resolveS3Params({ localFile, localDir, params, stage });
+    if (s3Params === null) {
+      continue;
+    }
+
+    files.push({ localPath: localFile, s3Key, s3Params });
+  }
+
+  return { files, localKeys };
+}
+
+interface GetKeysToDeleteOptions {
+  remoteKeys: IterableIterator<string>;
+  localKeys: Set<string>;
+  deleteRemoved: boolean;
+}
+
+/**
+ * Determines which remote keys should be deleted.
+ */
+function getKeysToDelete(options: GetKeysToDeleteOptions): string[] {
+  const { remoteKeys, localKeys, deleteRemoved } = options;
+  if (!deleteRemoved) {
+    return [];
+  }
+
+  const keysToDelete: string[] = [];
+  for (const remoteKey of remoteKeys) {
+    if (!localKeys.has(remoteKey)) {
+      keysToDelete.push(remoteKey);
+    }
+  }
+  return keysToDelete;
+}
+
+/**
+ * Syncs a local directory with an S3 bucket by uploading changed files
+ * and optionally deleting removed ones.
+ */
 export async function uploadDirectory(
   options: UploadDirectoryOptions,
 ): Promise<void> {
@@ -87,42 +181,20 @@ export async function uploadDirectory(
     log,
   } = options;
 
-  // Build a map of remote objects by key for quick lookup
-  const remoteByKey = new Map<string, S3Object>();
-  for await (const obj of listAllObjects(s3Client, bucket, prefix)) {
-    remoteByKey.set(obj.Key, obj);
-  }
+  const remoteByKey = await getRemoteObjectsMap({ s3Client, bucket, prefix });
+  const { files: filesToProcess, localKeys } = await getFilesToProcess({
+    localDir,
+    prefix,
+    params,
+    stage,
+    log,
+  });
 
-  // Build list of candidate files and track local keys
-  const filesToProcess: FileProcessEntry[] = [];
-  const localKeys = new Set<string>();
-
-  for await (const localFile of getLocalFiles(localDir, log)) {
-    const relativePath = path.relative(localDir, localFile);
-    const s3Key = prefix
-      ? `${prefix}${toS3Path(relativePath)}`
-      : toS3Path(relativePath);
-
-    localKeys.add(s3Key);
-
-    // Resolve per-file S3 params (may return null to skip)
-    const s3Params = resolveS3Params(localFile, localDir, params, stage);
-    if (s3Params === null) {
-      continue;
-    }
-
-    filesToProcess.push({ localPath: localFile, s3Key, s3Params });
-  }
-
-  // Determine files to delete (exist remotely but not locally)
-  const keysToDelete: string[] = [];
-  if (deleteRemoved) {
-    for (const remoteKey of remoteByKey.keys()) {
-      if (!localKeys.has(remoteKey)) {
-        keysToDelete.push(remoteKey);
-      }
-    }
-  }
+  const keysToDelete = getKeysToDelete({
+    remoteKeys: remoteByKey.keys(),
+    localKeys,
+    deleteRemoved,
+  });
 
   const totalOperations =
     filesToProcess.length + (keysToDelete.length > 0 ? 1 : 0);
@@ -133,22 +205,18 @@ export async function uploadDirectory(
     (percent) => `${localDir}: sync with bucket ${bucket} (${percent}%)`,
   );
 
-  // Stream, compare ETag/MD5, and upload in a single pass per file
   const limit = pLimit(maxConcurrency);
   await Promise.all(
     filesToProcess.map((entry) =>
       limit(async () => {
-        // Check if file has changed by comparing MD5 with ETag
         const remote = remoteByKey.get(entry.s3Key);
 
-        // For large files, multipart ETags have a different format (e.g. hash-number)
-        // If it's a simple MD5 hash, we compare it.
         if (remote?.ETag && !remote.ETag.includes('-')) {
           const localMD5 = await computeFileMD5(entry.localPath);
           if (localMD5 === remote.ETag) {
             completedOperations++;
             tracker.update(completedOperations, totalOperations);
-            return; // file unchanged
+            return;
           }
         }
 
@@ -167,8 +235,7 @@ export async function uploadDirectory(
             ContentType: contentType,
             ...entry.s3Params,
           },
-          // Optimal part size for multipart upload is 5MB by default
-          queueSize: S3_MULTIPART_UPLOAD_QUEUE_SIZE, // concurrent parts per file
+          queueSize: S3_MULTIPART_UPLOAD_QUEUE_SIZE,
           partSize: S3_MULTIPART_UPLOAD_PART_SIZE,
           leavePartsOnError: false,
         });
@@ -181,7 +248,6 @@ export async function uploadDirectory(
     ),
   );
 
-  // Delete removed files
   if (keysToDelete.length > 0) {
     await deleteObjectsByKeys(s3Client, bucket, keysToDelete);
     completedOperations++;

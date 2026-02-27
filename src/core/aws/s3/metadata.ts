@@ -29,27 +29,20 @@ export interface SyncMetadataOptions {
   log?: ErrorLogger;
 }
 
-export async function syncDirectoryMetadata(
-  options: SyncMetadataOptions,
-): Promise<void> {
-  const {
-    s3Client,
-    localDir,
-    bucket,
-    bucketPrefix,
-    acl,
-    defaultContentType,
-    params,
-    stage,
-    progress,
-    log,
-  } = options;
+interface GetFilesToSyncOptions {
+  localDir: string;
+  params: ParamEntry[];
+  stage?: string;
+  log?: ErrorLogger;
+}
 
-  let normalizedPrefix = '';
-  if (bucketPrefix.length > 0) {
-    normalizedPrefix = bucketPrefix.replace(/\/?$/, '').replace(/^\/?/, '/');
-  }
-
+/**
+ * Identifies local files that match the provided parameters and should have their metadata synced.
+ */
+async function getFilesToSync(
+  options: GetFilesToSyncOptions,
+): Promise<FileToSync[]> {
+  const { localDir, params, stage, log } = options;
   const fileMap = new Map<string, FileToSync>();
   const ignoredNames = new Set<string>(['.DS_Store']);
   const stageIgnoredFiles = new Set<string>();
@@ -80,8 +73,37 @@ export async function syncDirectoryMetadata(
     }
   }
 
-  const filesToSync = Array.from(fileMap.values());
+  return Array.from(fileMap.values());
+}
+
+/**
+ * Syncs metadata (ACL, Content-Type, etc.) for files that already exist in S3.
+ * This is useful when you want to update headers without re-uploading the file content.
+ */
+export async function syncDirectoryMetadata(
+  options: SyncMetadataOptions,
+): Promise<void> {
+  const {
+    s3Client,
+    localDir,
+    bucket,
+    bucketPrefix,
+    acl,
+    defaultContentType,
+    params,
+    stage,
+    progress,
+    log,
+  } = options;
+
+  let normalizedPrefix = '';
+  if (bucketPrefix.length > 0) {
+    normalizedPrefix = bucketPrefix.replace(/\/?$/, '').replace(/^\/?/, '/');
+  }
+
+  const filesToSync = await getFilesToSync({ localDir, params, stage, log });
   const bucketDir = `${bucket}${normalizedPrefix === '' ? '' : normalizedPrefix}/`;
+  const resolvedLocalDir = path.resolve(localDir) + path.sep;
 
   const limit = pLimit(DEFAULT_MAX_CONCURRENCY);
   let completed = 0;
@@ -96,15 +118,13 @@ export async function syncDirectoryMetadata(
         }
 
         const copySource = encodeSpecialCharacters(
-          toS3Path(
-            file.name.replace(path.resolve(localDir) + path.sep, bucketDir),
-          ),
+          toS3Path(file.name.replace(resolvedLocalDir, bucketDir)),
         );
 
         const key = encodeSpecialCharacters(
           toS3Path(
             file.name.replace(
-              path.resolve(localDir) + path.sep,
+              resolvedLocalDir,
               normalizedPrefix ? `${normalizedPrefix.replace(/^\//, '')}/` : '',
             ),
           ),
