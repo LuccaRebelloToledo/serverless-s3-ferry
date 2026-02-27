@@ -14,8 +14,11 @@ import {
  * Supports both array-style and object-style configurations.
  */
 export function getBucketConfigs(
-  rawConfig: RawS3FerryConfig | RawBucketConfig[],
+  rawConfig?: RawS3FerryConfig | RawBucketConfig[],
 ): RawBucketConfig[] | null {
+  if (!rawConfig) {
+    return null;
+  }
   if (Array.isArray(rawConfig)) {
     return rawConfig;
   }
@@ -82,11 +85,14 @@ export function buildParamMatchers(params: ParamEntry[]): ParamMatcher[] {
  * Checks if auto-sync should be skipped based on configuration or CLI options.
  */
 export function getNoSync(
-  rawConfig: RawS3FerryConfig | RawBucketConfig[],
+  rawConfig?: RawS3FerryConfig | RawBucketConfig[],
   optionNoSync?: boolean,
 ): boolean {
   if (optionNoSync) {
     return true;
+  }
+  if (!rawConfig) {
+    return false;
   }
   if (Array.isArray(rawConfig)) {
     return false;
@@ -99,9 +105,9 @@ export function getNoSync(
  * Retrieves the custom S3 endpoint from the configuration, if any.
  */
 export function getEndpoint(
-  rawConfig: RawS3FerryConfig | RawBucketConfig[],
+  rawConfig?: RawS3FerryConfig | RawBucketConfig[],
 ): string | null {
-  if (Array.isArray(rawConfig)) {
+  if (!rawConfig || Array.isArray(rawConfig)) {
     return null;
   }
   return (rawConfig.endpoint as string) ?? null;
@@ -111,9 +117,9 @@ export function getEndpoint(
  * Retrieves the list of custom lifecycle hooks from the configuration.
  */
 export function getCustomHooks(
-  rawConfig: RawS3FerryConfig | RawBucketConfig[],
+  rawConfig?: RawS3FerryConfig | RawBucketConfig[],
 ): string[] {
-  if (Array.isArray(rawConfig)) {
+  if (!rawConfig || Array.isArray(rawConfig)) {
     return [];
   }
   return (rawConfig.hooks as string[]) ?? [];

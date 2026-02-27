@@ -106,5 +106,22 @@ describe('copyObjectWithMetadata', () => {
         3,
       );
     });
+
+    it('handles undefined ContentLength by defaulting to 0', async () => {
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: undefined });
+      s3Mock.on(CopyObjectCommand).resolves({});
+
+      const client = new S3Client({});
+      await copyObjectWithMetadata({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        copySource: `${TEST_BUCKET}/missing.txt`,
+        key: 'missing.txt',
+        acl: 'private',
+        extraParams: {},
+      });
+
+      expect(s3Mock.commandCalls(CopyObjectCommand)).toHaveLength(1);
+    });
   });
 });

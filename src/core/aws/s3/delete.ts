@@ -47,9 +47,7 @@ export async function deleteDirectory(
   let totalDeleted = 0;
 
   for await (const obj of listAllObjects(s3Client, bucket, prefix)) {
-    if (obj.Key) {
-      currentBatch.push(obj.Key);
-    }
+    currentBatch.push(obj.Key);
 
     if (currentBatch.length >= S3_DELETE_BATCH_SIZE) {
       await deleteObjectsByKeys(s3Client, bucket, currentBatch);

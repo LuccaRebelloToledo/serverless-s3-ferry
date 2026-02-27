@@ -56,7 +56,7 @@ function mockLogging() {
 }
 
 function mockServerless(
-  config: RawS3FerryConfig | RawBucketConfig[],
+  config: RawS3FerryConfig | RawBucketConfig[] | undefined,
   servicePath: string,
 ): Serverless {
   return {
@@ -171,10 +171,7 @@ describe('ServerlessS3Ferry', () => {
       const logging = mockLogging();
 
       const plugin = new ServerlessS3Ferry(
-        mockServerless(
-          { buckets: undefined } as unknown as RawS3FerryConfig,
-          tmpDir,
-        ),
+        mockServerless(undefined, tmpDir),
         {} as S3FerryOptions,
         logging,
       );
@@ -431,6 +428,29 @@ describe('ServerlessS3Ferry', () => {
 
       await plugin.clear();
 
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['notice']).toHaveBeenCalledWith(
+        expect.stringContaining('No configuration found'),
+      );
+    });
+
+    it('logs notice when s3Ferry config is empty and clear is called', async () => {
+      const logging = mockLogging();
+      const serverless = mockServerless(undefined, tmpDir);
+      // Ensure custom.s3Ferry is actually undefined or missing
+      const custom = serverless.service.custom as Record<string, unknown>;
+      delete custom['s3Ferry'];
+
+      const plugin = new ServerlessS3Ferry(
+        serverless,
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.clear();
       const log = logging.log as unknown as Record<
         string,
         ReturnType<typeof vi.fn>
@@ -833,6 +853,23 @@ describe('ServerlessS3Ferry', () => {
 
       // If we got here without error, offline was set correctly
       expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+    });
+
+    it('reuses cached S3 client', async () => {
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless([{ bucketName: TEST_BUCKET, localDir: '.' }], tmpDir),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      const internalPlugin = plugin as unknown as { getS3Client(): S3Client };
+      // Trigger client creation
+      const client1 = internalPlugin.getS3Client();
+      // Access again
+      const client2 = internalPlugin.getS3Client();
+
+      expect(client1).toBe(client2);
     });
   });
 

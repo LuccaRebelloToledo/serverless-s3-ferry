@@ -175,5 +175,22 @@ describe('listAllObjects', () => {
 
       expect(result).toEqual([]);
     });
+
+    it('skips objects without keys', async () => {
+      s3Mock.on(ListObjectsV2Command).resolves({
+        Contents: [
+          { ETag: '"a"', Size: 10 },
+          { Key: 'key2', ETag: '"b"', Size: 20 },
+        ],
+        IsTruncated: false,
+      });
+
+      const client = new S3Client({});
+      const result = await generatorToArray(
+        listAllObjects(client, TEST_BUCKET, ''),
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0]?.Key).toBe('key2');
+    });
   });
 });

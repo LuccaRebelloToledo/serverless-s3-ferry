@@ -50,13 +50,13 @@ async function getFilesToSync(
   for await (const localFile of getLocalFiles(localDir, log)) {
     if (ignoredNames.has(path.basename(localFile))) continue;
 
+    const relativePath = path.relative(localDir, localFile);
+
     for (const param of params) {
-      if (stageIgnoredFiles.has(localFile)) break;
-
       const glob = Object.keys(param)[0];
-      const fullGlob = `${path.resolve(localDir)}${path.sep}${glob}`;
+      if (!glob) continue;
 
-      if (minimatch(localFile, fullGlob)) {
+      if (minimatch(relativePath, glob)) {
         const matchParams = extractMetaParams(param);
         if (
           matchParams['OnlyForStage'] &&
@@ -141,10 +141,7 @@ export async function syncDirectoryMetadata(
         });
 
         completed++;
-        const percent =
-          filesToSync.length > 0
-            ? Math.round((completed / filesToSync.length) * 100)
-            : 0;
+        const percent = Math.round((completed / filesToSync.length) * 100);
         progress.update(
           `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
         );
