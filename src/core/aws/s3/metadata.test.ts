@@ -245,7 +245,7 @@ describe('syncDirectoryMetadata', () => {
       expect(call.args[0].input.CacheControl).toBe('max-age=300');
     });
 
-    it('skips file excluded by OnlyForStage in first pattern but matches later pattern', async () => {
+    it('includes file when later pattern without OnlyForStage overrides earlier exclusion', async () => {
       fs.writeFileSync(path.join(tmpDir, 'config.js'), 'code');
 
       s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
@@ -267,9 +267,11 @@ describe('syncDirectoryMetadata', () => {
       });
 
       const calls = s3Mock.commandCalls(CopyObjectCommand);
-      // File matches first pattern with OnlyForStage=production, but env is development
-      // So it's ignored and won't match the second pattern either
-      expect(calls).toHaveLength(0);
+      // Later pattern without OnlyForStage clears the restriction
+      expect(calls).toHaveLength(1);
+      const call = calls[0];
+      if (!call) throw new Error('Expected CopyObjectCommand call');
+      expect(call.args[0].input.CacheControl).toBe('max-age=3600');
     });
   });
 
@@ -321,7 +323,7 @@ describe('syncDirectoryMetadata', () => {
       expect(call.args[0].input.ContentType).toBe('application/octet-stream');
     });
 
-    it('handles undefined content type when no detection and no default', async () => {
+    it('falls back to application/octet-stream when no detection and no default', async () => {
       fs.writeFileSync(path.join(tmpDir, 'data.unknown123'), 'stuff');
 
       s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
@@ -341,7 +343,7 @@ describe('syncDirectoryMetadata', () => {
       const calls = s3Mock.commandCalls(CopyObjectCommand);
       const call = calls[0];
       if (!call) throw new Error('Expected CopyObjectCommand call');
-      expect(call.args[0].input.ContentType).toBeUndefined();
+      expect(call.args[0].input.ContentType).toBe('application/octet-stream');
     });
   });
 
@@ -797,7 +799,7 @@ describe('syncDirectoryMetadata', () => {
       expect(copyCalls[0]?.args[0].input.CacheControl).toBe('max-age=200');
     });
 
-    it('skips processing if file was already ignored by stage in a previous glob', async () => {
+    it('includes file when later pattern without OnlyForStage overrides earlier stage exclusion', async () => {
       fs.writeFileSync(path.join(tmpDir, 'ignored.js'), 'code');
       s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 10 });
       s3Mock.on(CopyObjectCommand).resolves({});
@@ -811,13 +813,16 @@ describe('syncDirectoryMetadata', () => {
         acl: 'private',
         stage: 'prod',
         params: [
-          { 'ignored.js': { OnlyForStage: 'dev' } }, // marks as ignored
-          { '*.js': { CacheControl: 'max-age=100' } }, // should be skipped due to break
+          { 'ignored.js': { OnlyForStage: 'dev' } },
+          { '*.js': { CacheControl: 'max-age=100' } }, // later pattern clears OnlyForStage
         ],
         progress: mockProgress(),
       });
 
-      expect(s3Mock.commandCalls(CopyObjectCommand)).toHaveLength(0);
+      // Later pattern without OnlyForStage clears the restriction
+      const calls = s3Mock.commandCalls(CopyObjectCommand);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.args[0].input.CacheControl).toBe('max-age=100');
     });
 
     it('updates progress to 0% if no files match the params', async () => {

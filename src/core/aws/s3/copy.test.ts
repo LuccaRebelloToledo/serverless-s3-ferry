@@ -82,17 +82,15 @@ describe('copyObjectWithMetadata', () => {
       );
       expect(createCall?.args[0].input.ContentType).toBe('application/zip');
 
-      // 3. Check Parts (12GB / 5GB = 3 parts: 0-5G, 5-10G, 10-12G)
+      // 3. Check Parts (12GB / 500MB = 25 parts, last part is smaller)
       const partCalls = s3Mock.commandCalls(UploadPartCopyCommand);
-      expect(partCalls).toHaveLength(3);
+      expect(partCalls).toHaveLength(25);
+      // Verify first and last part ranges
       expect(partCalls[0]?.args[0].input.CopySourceRange).toBe(
-        'bytes=0-5368709119',
+        'bytes=0-524287999',
       );
-      expect(partCalls[1]?.args[0].input.CopySourceRange).toBe(
-        'bytes=5368709120-10737418239',
-      );
-      expect(partCalls[2]?.args[0].input.CopySourceRange).toBe(
-        'bytes=10737418240-12884901887',
+      expect(partCalls[24]?.args[0].input.CopySourceRange).toBe(
+        'bytes=12582912000-12884901887',
       );
 
       // 4. Check Complete
@@ -103,7 +101,7 @@ describe('copyObjectWithMetadata', () => {
         CompleteMultipartUploadCommand,
       )[0];
       expect(completeCall?.args[0].input.MultipartUpload?.Parts).toHaveLength(
-        3,
+        25,
       );
     });
 

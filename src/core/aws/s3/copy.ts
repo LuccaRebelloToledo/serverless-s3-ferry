@@ -1,4 +1,5 @@
 import {
+  AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CopyObjectCommand,
   type CopyObjectCommandInput,
@@ -83,49 +84,62 @@ export async function copyObjectWithMetadata(
   );
 
   const uploadId = createResponse.UploadId;
-  const parts = [];
 
-  // b. Upload parts using UploadPartCopy
-  let partNumber = 1;
-  for (
-    let start = 0;
-    start < objectSize;
-    start += S3_MULTIPART_COPY_PART_SIZE
-  ) {
-    const end = Math.min(
-      start + S3_MULTIPART_COPY_PART_SIZE - 1,
-      objectSize - 1,
-    );
-    const copyRange = `bytes=${start}-${end}`;
+  try {
+    const parts = [];
 
-    const partResponse = await s3Client.send(
-      new UploadPartCopyCommand({
+    // b. Upload parts using UploadPartCopy
+    let partNumber = 1;
+    for (
+      let start = 0;
+      start < objectSize;
+      start += S3_MULTIPART_COPY_PART_SIZE
+    ) {
+      const end = Math.min(
+        start + S3_MULTIPART_COPY_PART_SIZE - 1,
+        objectSize - 1,
+      );
+      const copyRange = `bytes=${start}-${end}`;
+
+      const partResponse = await s3Client.send(
+        new UploadPartCopyCommand({
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+          CopySource: copySource,
+          CopySourceRange: copyRange,
+        }),
+      );
+
+      parts.push({
+        ETag: partResponse.CopyPartResult?.ETag,
+        PartNumber: partNumber,
+      });
+
+      partNumber++;
+    }
+
+    // c. Complete multipart upload
+    await s3Client.send(
+      new CompleteMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
         UploadId: uploadId,
-        PartNumber: partNumber,
-        CopySource: copySource,
-        CopySourceRange: copyRange,
+        MultipartUpload: {
+          Parts: parts,
+        },
       }),
     );
-
-    parts.push({
-      ETag: partResponse.CopyPartResult?.ETag,
-      PartNumber: partNumber,
-    });
-
-    partNumber++;
+  } catch (error) {
+    // Abort orphaned multipart upload to prevent storage cost accumulation
+    await s3Client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+      }),
+    );
+    throw error;
   }
-
-  // c. Complete multipart upload
-  await s3Client.send(
-    new CompleteMultipartUploadCommand({
-      Bucket: bucket,
-      Key: key,
-      UploadId: uploadId,
-      MultipartUpload: {
-        Parts: parts,
-      },
-    }),
-  );
 }

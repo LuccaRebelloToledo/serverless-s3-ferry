@@ -27,7 +27,6 @@ export async function* listAllObjects(
           yield {
             Key: obj.Key,
             ETag: obj.ETag,
-            Size: obj.Size,
           };
         }
       }

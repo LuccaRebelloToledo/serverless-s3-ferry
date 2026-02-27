@@ -1,5 +1,5 @@
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
-import { TEST_BUCKET } from '@shared/testing';
+import { generatorToArray, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listAllObjects } from './list';
@@ -14,14 +14,6 @@ describe('listAllObjects', () => {
   afterEach(() => {
     s3Mock.restore();
   });
-
-  async function generatorToArray<T>(gen: AsyncGenerator<T>): Promise<T[]> {
-    const arr = [];
-    for await (const val of gen) {
-      arr.push(val);
-    }
-    return arr;
-  }
 
   describe('basic functionality', () => {
     it('lists objects without pagination', async () => {
@@ -42,12 +34,10 @@ describe('listAllObjects', () => {
       expect(result[0]).toEqual({
         Key: 'file1.txt',
         ETag: '"abc123"',
-        Size: 100,
       });
       expect(result[1]).toEqual({
         Key: 'file2.txt',
         ETag: '"def456"',
-        Size: 200,
       });
     });
 

@@ -47,3 +47,28 @@ export function mockAwsIam() {
     }),
   };
 }
+
+export function mockLogging() {
+  return {
+    log: {
+      error: vi.fn(),
+      notice: vi.fn(),
+      verbose: vi.fn(),
+      success: vi.fn(),
+      warning: vi.fn(),
+    },
+    progress: {
+      create: vi.fn(() => mockProgress()),
+    },
+  } as unknown as Plugin.Logging;
+}
+
+export async function generatorToArray<T>(
+  gen: AsyncGenerator<T>,
+): Promise<T[]> {
+  const arr: T[] = [];
+  for await (const val of gen) {
+    arr.push(val);
+  }
+  return arr;
+}

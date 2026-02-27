@@ -6,7 +6,6 @@ import { SyncOrchestrator } from '@core/sync-orchestrator';
 import {
   type AwsProviderExtended,
   type BucketSyncConfig,
-  ConfigValidationError,
   DEFAULT_OFFLINE_VALUE,
   getBucketConfigs,
   getCustomHooks,
@@ -241,14 +240,9 @@ class ServerlessS3Ferry implements Plugin {
       return config.bucketName;
     }
 
-    if (config.bucketNameKey) {
-      const provider = this.getProvider();
-      return resolveStackOutput(provider, config.bucketNameKey);
-    }
-
-    throw new ConfigValidationError(
-      'Unable to find bucketName. Please provide a value for bucketName or bucketNameKey',
-    );
+    // bucketNameKey is guaranteed by parseBucketConfig validation
+    const provider = this.getProvider();
+    return resolveStackOutput(provider, config.bucketNameKey!);
   }
 
   private getRawBucketConfigs(): RawBucketConfig[] | null {

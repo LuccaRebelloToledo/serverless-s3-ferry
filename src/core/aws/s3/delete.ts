@@ -21,7 +21,7 @@ export async function deleteObjectsByKeys(
   let deleted = 0;
   for (let i = 0; i < keys.length; i += S3_DELETE_BATCH_SIZE) {
     const batch = keys.slice(i, i + S3_DELETE_BATCH_SIZE);
-    await s3Client.send(
+    const response = await s3Client.send(
       new DeleteObjectsCommand({
         Bucket: bucket,
         Delete: {
@@ -30,8 +30,41 @@ export async function deleteObjectsByKeys(
         },
       }),
     );
+    const errors = response.Errors;
+    if (errors && errors.length > 0) {
+      const failedKeys = errors.map((e) => e.Key).join(', ');
+      throw new Error(
+        `Failed to delete ${errors.length} object(s) from ${bucket}: ${failedKeys}`,
+      );
+    }
     deleted += batch.length;
     onBatch?.(deleted, keys.length);
+  }
+}
+
+/**
+ * Sends a single delete batch directly (keys must be <= S3_DELETE_BATCH_SIZE).
+ */
+async function deleteBatch(
+  s3Client: S3Client,
+  bucket: string,
+  keys: string[],
+): Promise<void> {
+  const response = await s3Client.send(
+    new DeleteObjectsCommand({
+      Bucket: bucket,
+      Delete: {
+        Objects: keys.map((Key) => ({ Key })),
+        Quiet: true,
+      },
+    }),
+  );
+  const errors = response.Errors;
+  if (errors && errors.length > 0) {
+    const failedKeys = errors.map((e) => e.Key).join(', ');
+    throw new Error(
+      `Failed to delete ${errors.length} object(s) from ${bucket}: ${failedKeys}`,
+    );
   }
 }
 
@@ -50,7 +83,7 @@ export async function deleteDirectory(
     currentBatch.push(obj.Key);
 
     if (currentBatch.length >= S3_DELETE_BATCH_SIZE) {
-      await deleteObjectsByKeys(s3Client, bucket, currentBatch);
+      await deleteBatch(s3Client, bucket, currentBatch);
       totalDeleted += currentBatch.length;
       currentBatch = [];
       progress.update(
@@ -60,7 +93,7 @@ export async function deleteDirectory(
   }
 
   if (currentBatch.length > 0) {
-    await deleteObjectsByKeys(s3Client, bucket, currentBatch);
+    await deleteBatch(s3Client, bucket, currentBatch);
     totalDeleted += currentBatch.length;
   }
 

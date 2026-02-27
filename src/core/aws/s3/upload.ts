@@ -10,6 +10,7 @@ import {
   getLocalFiles,
   type ParamMatcher,
   type Plugin,
+  resolveS3Params,
   S3_MULTIPART_UPLOAD_PART_SIZE,
   S3_MULTIPART_UPLOAD_QUEUE_SIZE,
   type S3Object,
@@ -18,7 +19,6 @@ import {
   type UploadDirOptions,
 } from '@shared';
 import mime from 'mime';
-import { minimatch } from 'minimatch';
 import pLimit from 'p-limit';
 import { deleteObjectsByKeys } from './delete';
 import { computeFileMD5 } from './hash';
@@ -26,6 +26,7 @@ import { listAllObjects } from './list';
 
 export interface UploadDirectoryOptions extends UploadDirOptions {
   s3Client: S3Client;
+  maxConcurrency?: number;
   progress: Plugin.Progress;
   servicePath: string;
   stage?: string;
@@ -36,41 +37,6 @@ interface FileProcessEntry {
   localPath: string;
   s3Key: string;
   s3Params: S3Params;
-}
-
-interface ResolveS3ParamsOptions {
-  localFile: string;
-  localDir: string;
-  params?: ParamMatcher[];
-  stage?: string;
-}
-
-function resolveS3Params(options: ResolveS3ParamsOptions): S3Params | null {
-  const { localFile, localDir, params, stage } = options;
-
-  if (!params || params.length === 0) {
-    return {};
-  }
-
-  const s3Params: S3Params = {};
-  let onlyForStage: string | undefined;
-
-  for (const param of params) {
-    if (minimatch(localFile, `${path.resolve(localDir)}/${param.glob}`)) {
-      Object.assign(s3Params, param.params);
-      if (s3Params['OnlyForStage']) {
-        onlyForStage = s3Params['OnlyForStage'];
-      }
-    }
-  }
-
-  delete s3Params['OnlyForStage'];
-
-  if (onlyForStage && onlyForStage !== stage) {
-    return null; // skip this file
-  }
-
-  return s3Params;
 }
 
 interface GetRemoteObjectsMapOptions {
@@ -117,14 +83,18 @@ async function getFilesToProcess(
   const localKeys = new Set<string>();
 
   for await (const localFile of getLocalFiles(localDir, log)) {
-    const relativePath = path.relative(localDir, localFile);
+    const normalizedPath = toS3Path(path.relative(localDir, localFile));
     const s3Key = prefix
-      ? `${prefix}${toS3Path(relativePath)}`
-      : toS3Path(relativePath);
+      ? `${prefix.replace(/\/?$/, '/')}${normalizedPath}`
+      : normalizedPath;
 
     localKeys.add(s3Key);
 
-    const s3Params = resolveS3Params({ localFile, localDir, params, stage });
+    const s3Params = resolveS3Params({
+      relativePath: normalizedPath,
+      params,
+      stage,
+    });
     if (s3Params === null) {
       continue;
     }

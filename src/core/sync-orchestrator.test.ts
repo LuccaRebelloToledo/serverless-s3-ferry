@@ -113,7 +113,7 @@ describe('SyncOrchestrator', () => {
       ];
 
       await expect(orchestrator.sync(rawBuckets)).rejects.toThrow(
-        'exec failed',
+        '1 bucket operation(s) failed',
       );
       expect(options.log.error).toHaveBeenCalledWith(
         expect.stringContaining('Pre-command failed'),

@@ -19,7 +19,6 @@ import {
 } from '@aws-sdk/client-s3';
 import type {
   AwsProviderExtended,
-  Plugin,
   RawBucketConfig,
   RawS3FerryConfig,
   S3FerryOptions,
@@ -27,7 +26,7 @@ import type {
 } from '@shared';
 import {
   mockAwsIam,
-  mockProgress,
+  mockLogging,
   mockProvider,
   TEST_BUCKET,
   TEST_STACK_NAME,
@@ -39,21 +38,6 @@ vi.mock('@core/aws/iam', () => mockAwsIam());
 
 // @ts-expect-error CJS module.exports is resolved at runtime by vitest
 import ServerlessS3Ferry from './index';
-
-function mockLogging() {
-  return {
-    log: {
-      error: vi.fn(),
-      notice: vi.fn(),
-      verbose: vi.fn(),
-      success: vi.fn(),
-      warning: vi.fn(),
-    },
-    progress: {
-      create: vi.fn(() => mockProgress()),
-    },
-  } as unknown as Plugin.Logging;
-}
 
 function mockServerless(
   config: RawS3FerryConfig | RawBucketConfig[] | undefined,
@@ -369,23 +353,33 @@ describe('ServerlessS3Ferry', () => {
       expect(s3Mock.commandCalls(ListObjectsV2Command)).toHaveLength(2);
     });
 
-    it('throws error when bucketName and bucketNameKey are missing', async () => {
+    it('getBucketName resolves bucketNameKey via CloudFormation', async () => {
+      cfnMock.on(DescribeStacksCommand).resolves({
+        Stacks: [
+          {
+            StackName: TEST_STACK_NAME,
+            Outputs: [
+              { OutputKey: 'BucketRef', OutputValue: 'resolved-bucket' },
+            ],
+            CreationTime: new Date(),
+            StackStatus: 'CREATE_COMPLETE',
+          },
+        ],
+      });
+
       const plugin = new ServerlessS3Ferry(
         mockServerless([], tmpDir),
         {} as S3FerryOptions,
         mockLogging(),
       );
 
-      // Bypass visibility to reach the unreachable check in getBucketName
-      await expect(
-        (
-          plugin as unknown as {
-            getBucketName: (config: RawBucketConfig) => Promise<string>;
-          }
-        ).getBucketName({ localDir: '.' }),
-      ).rejects.toThrow(
-        'Unable to find bucketName. Please provide a value for bucketName or bucketNameKey',
-      );
+      const result = await (
+        plugin as unknown as {
+          getBucketName: (config: RawBucketConfig) => Promise<string>;
+        }
+      ).getBucketName({ localDir: '.', bucketNameKey: 'BucketRef' });
+
+      expect(result).toBe('resolved-bucket');
     });
   });
 

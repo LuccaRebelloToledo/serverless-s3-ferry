@@ -1,18 +1,20 @@
 import path from 'node:path';
 import type { ObjectCannedACL, S3Client } from '@aws-sdk/client-s3';
 import {
+  buildParamMatchers,
+  createProgressTracker,
+  DEFAULT_CONTENT_TYPE,
   DEFAULT_MAX_CONCURRENCY,
   type ErrorLogger,
   encodeSpecialCharacters,
-  extractMetaParams,
   type FileToSync,
   getLocalFiles,
   type ParamEntry,
   type Plugin,
+  resolveS3Params,
   toS3Path,
 } from '@shared';
 import mime from 'mime';
-import { minimatch } from 'minimatch';
 import pLimit from 'p-limit';
 import { copyObjectWithMetadata } from './copy';
 
@@ -44,33 +46,22 @@ async function getFilesToSync(
 ): Promise<FileToSync[]> {
   const { localDir, params, stage, log } = options;
   const fileMap = new Map<string, FileToSync>();
-  const ignoredNames = new Set<string>(['.DS_Store']);
-  const stageIgnoredFiles = new Set<string>();
+  const paramMatchers = buildParamMatchers(params);
 
   for await (const localFile of getLocalFiles(localDir, log)) {
-    if (ignoredNames.has(path.basename(localFile))) continue;
+    const relativePath = toS3Path(path.relative(localDir, localFile));
+    const s3Params = resolveS3Params({
+      relativePath,
+      params: paramMatchers,
+      stage,
+      skipUnmatched: true,
+    });
 
-    const relativePath = path.relative(localDir, localFile);
-
-    for (const param of params) {
-      const glob = Object.keys(param)[0];
-      if (!glob) continue;
-
-      if (minimatch(relativePath, glob)) {
-        const matchParams = extractMetaParams(param);
-        if (
-          matchParams['OnlyForStage'] &&
-          matchParams['OnlyForStage'] !== stage
-        ) {
-          stageIgnoredFiles.add(localFile);
-          fileMap.delete(localFile);
-          break;
-        }
-        delete matchParams['OnlyForStage'];
-
-        fileMap.set(localFile, { name: localFile, params: matchParams });
-      }
+    if (s3Params === null) {
+      continue;
     }
+
+    fileMap.set(localFile, { name: localFile, params: s3Params });
   }
 
   return Array.from(fileMap.values());
@@ -108,14 +99,17 @@ export async function syncDirectoryMetadata(
   const limit = pLimit(DEFAULT_MAX_CONCURRENCY);
   let completed = 0;
 
+  const tracker = createProgressTracker(
+    progress,
+    (percent) =>
+      `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
+  );
+
   await Promise.all(
     filesToSync.map((file) =>
       limit(async () => {
-        let contentType: string | undefined;
-        const detectedContentType = mime.getType(file.name);
-        if (detectedContentType !== null || defaultContentType) {
-          contentType = detectedContentType ?? defaultContentType;
-        }
+        const contentType =
+          mime.getType(file.name) ?? defaultContentType ?? DEFAULT_CONTENT_TYPE;
 
         const copySource = encodeSpecialCharacters(
           toS3Path(file.name.replace(resolvedLocalDir, bucketDir)),
@@ -141,10 +135,7 @@ export async function syncDirectoryMetadata(
         });
 
         completed++;
-        const percent = Math.round((completed / filesToSync.length) * 100);
-        progress.update(
-          `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
-        );
+        tracker.update(completed, filesToSync.length);
       }),
     ),
   );

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { generatorToArray } from '@shared/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLocalFiles } from './files';
 
@@ -14,16 +15,6 @@ describe('getLocalFiles', () => {
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
-
-  async function generatorToArray(
-    gen: AsyncGenerator<string>,
-  ): Promise<string[]> {
-    const arr = [];
-    for await (const val of gen) {
-      arr.push(val);
-    }
-    return arr;
-  }
 
   it('lists files recursively', async () => {
     fs.mkdirSync(path.join(tmpDir, 'sub'));

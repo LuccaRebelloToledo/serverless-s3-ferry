@@ -123,7 +123,21 @@ export class SyncOrchestrator {
         }
       });
 
-      await Promise.all(promises);
+      const results = await Promise.allSettled(promises);
+      const failures = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+
+      if (failures.length > 0) {
+        for (const failure of failures) {
+          this.options.log.error(`Bucket operation failed: ${failure.reason}`);
+        }
+        const errors = failures.map((f) => f.reason as Error);
+        throw new AggregateError(
+          errors,
+          `${failures.length} bucket operation(s) failed`,
+        );
+      }
 
       if (invokedAsCommand) {
         this.options.log.success(successMessage);
