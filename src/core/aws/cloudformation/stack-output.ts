@@ -5,15 +5,30 @@ import {
 import { getAwsOptions } from '@core/aws/iam';
 import { type AwsProviderExtended, StackOutputError } from '@shared';
 
+const cfnClientsByRegion = new Map<string, CloudFormationClient>();
+
+function getCloudFormationClient(
+  provider: AwsProviderExtended,
+): CloudFormationClient {
+  const awsOptions = getAwsOptions(provider);
+  const region = awsOptions.region;
+
+  let client = cfnClientsByRegion.get(region);
+  if (!client) {
+    client = new CloudFormationClient({
+      region,
+      credentials: awsOptions.credentials,
+    });
+    cfnClientsByRegion.set(region, client);
+  }
+  return client;
+}
+
 export async function resolveStackOutput(
   provider: AwsProviderExtended,
   outputKey: string,
 ): Promise<string> {
-  const awsOptions = getAwsOptions(provider);
-  const cfn = new CloudFormationClient({
-    region: awsOptions.region,
-    credentials: awsOptions.credentials,
-  });
+  const cfn = getCloudFormationClient(provider);
 
   const stackName = provider.naming['getStackName']?.();
   if (!stackName) {

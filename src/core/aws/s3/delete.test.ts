@@ -135,4 +135,27 @@ describe('deleteDirectory', () => {
 
     expect(s3Mock.commandCalls(DeleteObjectsCommand)).toHaveLength(0);
   });
+
+  it('skips objects without keys', async () => {
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ ETag: '"a"' }, { Key: 'valid.txt' }],
+      IsTruncated: false,
+    });
+    s3Mock.on(DeleteObjectsCommand).resolves({});
+
+    const client = new S3Client({});
+    await deleteDirectory({
+      s3Client: client,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      progress: mockProgress(),
+    });
+
+    const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
+    expect(deleteCalls).toHaveLength(1);
+    // Only valid.txt should be in the batch, covering the obj.Key check
+    expect(deleteCalls[0]?.args[0].input.Delete?.Objects).toEqual([
+      { Key: 'valid.txt' },
+    ]);
+  });
 });

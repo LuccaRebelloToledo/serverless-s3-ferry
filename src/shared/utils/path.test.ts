@@ -3,15 +3,24 @@ import { describe, expect, it } from 'vitest';
 import { encodeSpecialCharacters, toS3Path } from './path';
 
 describe('toS3Path', () => {
-  it('replaces path.sep with forward slashes', () => {
-    // On Unix path.sep is '/', on Windows it's '\'
-    // toS3Path normalizes OS-specific separators to '/'
+  it('replaces OS-specific separators with forward slashes', () => {
+    // Unix: foo/bar/baz
+    // Windows: foo\bar\baz
     const input = ['foo', 'bar', 'baz'].join(path.sep);
     expect(toS3Path(input)).toBe('foo/bar/baz');
   });
 
-  it('leaves unix paths unchanged', () => {
-    expect(toS3Path('foo/bar/baz')).toBe('foo/bar/baz');
+  it('removes leading slashes', () => {
+    expect(toS3Path('/foo/bar')).toBe('foo/bar');
+    expect(toS3Path('///foo/bar')).toBe('foo/bar');
+  });
+
+  it('collapses multiple slashes', () => {
+    expect(toS3Path('foo//bar///baz')).toBe('foo/bar/baz');
+  });
+
+  it('forces backslashes to forward slashes regardless of OS', () => {
+    expect(toS3Path('windows\\path\\style')).toBe('windows/path/style');
   });
 
   it('handles empty string', () => {

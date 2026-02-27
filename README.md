@@ -22,13 +22,15 @@ This implementation does not reuse any code from the original project.
 ## Features
 
 - Sync local directories to S3 buckets on deploy and remove
+- **High Performance**: Concurrent uploads and multipart support for large files (> 5GB)
+- **Resilient**: Built-in adaptive retry strategy for handling throttling and network issues
+- **Memory Efficient**: Uses Node.js async streams and generators for processing thousands of files
 - Per-file cache control and content type configuration via glob patterns
 - Bucket tagging support (appends to existing tags)
 - Resolve bucket names from CloudFormation stack outputs
 - Conditional sync rules with the `enabled` flag
 - Offline development support with `serverless-offline` and `serverless-s3-local`
 - Custom lifecycle hook integration
-- Concurrent uploads with configurable parallelism
 
 ## Table of Contents
 
@@ -36,6 +38,7 @@ This implementation does not reuse any code from the original project.
 - [Compatibility](#compatibility)
 - [Configuration](#configuration)
 - [Configuration Reference](#configuration-reference)
+- [IAM Permissions](#iam-permissions)
 - [Usage](#usage)
 - [Offline Usage](#offline-usage)
 - [Advanced Configuration](#advanced-configuration)
@@ -137,7 +140,7 @@ resources:
 | `deleteRemoved` | boolean | `true` | Delete S3 objects absent from `localDir` |
 | `acl` | string | `'private'` | S3 object ACL |
 | `defaultContentType` | string | — | Fallback MIME type |
-| `params` | array | — | Per-file S3 params via glob patterns |
+| `params` | array | `[]` | Per-file S3 params via glob patterns |
 | `bucketTags` | object | — | Tags to merge into the bucket |
 | `enabled` | boolean | `true` | Disable this sync rule when `false` |
 | `preCommand` | string | — | Shell command to run before sync |
@@ -150,8 +153,22 @@ These are set directly on the `s3Ferry` object (instead of using the array short
 |--------|------|---------|-------------|
 | `endpoint` | string | — | Custom S3 endpoint (e.g., for local development) |
 | `noSync` | boolean | `false` | Disable auto-sync on deploy/remove |
-| `hooks` | string[] | — | Additional lifecycle hooks to trigger sync |
-| `buckets` | array | — | Bucket config list (required when using global options) |
+| `hooks` | string[] | `[]` | Additional lifecycle hooks to trigger sync |
+| `buckets` | array | `[]` | Bucket config list (required when using global options) |
+
+## IAM Permissions
+
+To use this plugin, your AWS credentials must have the following permissions:
+
+### S3 Permissions
+- `s3:PutObject`
+- `s3:GetObject`
+- `s3:ListBucket`
+- `s3:DeleteObject` (if `deleteRemoved` is true)
+- `s3:GetBucketTagging` and `s3:PutBucketTagging` (if `bucketTags` is used)
+
+### CloudFormation Permissions (optional)
+- `cloudformation:DescribeStacks` (required only if using `bucketNameKey`)
 
 ## Usage
 
@@ -165,14 +182,30 @@ Run `sls remove --nos3ferry` -- remove the stack without deleting S3 objects.
 
 ### `sls s3ferry`
 
-Sync local directories and S3 prefixes on demand.
+Sync everything (files, metadata, and tags) on demand.
+
+### `sls s3ferry:sync`
+Sync files only.
+
+### `sls s3ferry:metadata`
+Sync metadata only (ACL, Cache-Control, etc.).
+
+### `sls s3ferry:tags`
+Sync bucket tags only.
 
 ### `sls s3ferry bucket`
 
-Sync a specific bucket only.
+Sync everything for a specific bucket only.
 
 ```sh
 sls s3ferry bucket -b my-static-site-assets
+```
+
+You can also append `:sync`, `:metadata` or `:tags` to the bucket command:
+
+```sh
+# Sync only metadata for a specific bucket
+sls s3ferry bucket:metadata -b my-static-site-assets
 ```
 
 ## Offline Usage
@@ -233,15 +266,21 @@ custom:
 
 ### Stage-scoped file params
 
-Use the `OnlyForStage` param to upload a file only when a specific stage is active:
+Use the `OnlyForStage` param to upload a file only when a specific stage is active. This is useful for environment-specific configuration files:
 
 ```yaml
-# Only upload this file when --stage production
+# Upload environment-specific files only to their respective stages
 params:
-  - "*.production.js":
+  - "config/settings.dev.json":
+      OnlyForStage: dev
+  - "config/settings.staging.json":
+      OnlyForStage: staging
+  - "config/settings.prod.json":
       CacheControl: 'max-age=31536000'
       OnlyForStage: production
 ```
+
+> **Note:** `OnlyForStage` is a special parameter handled by the plugin and is not sent to S3 as an object property.
 
 ## Contributing
 

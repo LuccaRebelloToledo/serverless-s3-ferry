@@ -1,7 +1,17 @@
 import path from 'node:path';
 
+/**
+ * Converts an OS-specific path to a normalized S3 key.
+ * - Replaces backslashes with forward slashes.
+ * - Removes leading slashes.
+ * - Collapses multiple slashes into one.
+ */
 export function toS3Path(osPath: string): string {
-  return osPath.replace(new RegExp(`\\${path.sep}`, 'g'), '/');
+  return osPath
+    .replace(new RegExp(`\\${path.sep}`, 'g'), '/') // OS separators to /
+    .replace(/\\/g, '/') // Force backslashes to / (Windows fallback)
+    .replace(/\/+/g, '/') // Collapse multiple // to /
+    .replace(/^\//, ''); // Remove leading /
 }
 
 /**

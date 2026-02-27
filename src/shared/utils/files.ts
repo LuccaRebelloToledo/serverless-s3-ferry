@@ -1,41 +1,39 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ErrorLogger } from '@shared';
+import { IGNORED_FILE_NAMES } from '../constants/plugin';
 
-export function getLocalFiles(dir: string, log?: ErrorLogger): string[] {
-  const files: string[] = [];
-  collectFiles(dir, files, log);
-  return files;
-}
-
-function collectFiles(dir: string, files: string[], log?: ErrorLogger): void {
+/**
+ * Lists all files in a directory recursively using an async generator
+ * to be memory efficient. Automatically filters out ignored files (e.g. .DS_Store).
+ */
+export async function* getLocalFiles(
+  dir: string,
+  log?: ErrorLogger,
+): AsyncGenerator<string> {
   try {
-    fs.accessSync(dir, fs.constants.R_OK);
+    await fs.promises.access(dir, fs.constants.R_OK);
   } catch {
     log?.error(`The directory ${dir} does not exist.`);
     return;
   }
 
-  for (const file of fs.readdirSync(dir)) {
-    const fullPath = path.join(dir, file);
-    try {
-      fs.accessSync(fullPath, fs.constants.R_OK);
-    } catch {
-      log?.error(`The file ${fullPath} does not exist.`);
-      continue;
-    }
+  const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
-    const stat = fs.lstatSync(fullPath);
+  for (const entry of entries) {
+    if (IGNORED_FILE_NAMES.has(entry.name)) continue;
 
-    if (stat.isSymbolicLink()) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isSymbolicLink()) {
       log?.warning(`Ignoring symbolic link: ${fullPath}`);
       continue;
     }
 
-    if (stat.isDirectory()) {
-      collectFiles(fullPath, files, log);
+    if (entry.isDirectory()) {
+      yield* getLocalFiles(fullPath, log);
     } else {
-      files.push(fullPath);
+      yield fullPath;
     }
   }
 }

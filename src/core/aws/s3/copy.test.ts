@@ -1,4 +1,11 @@
-import { CopyObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CompleteMultipartUploadCommand,
+  CopyObjectCommand,
+  CreateMultipartUploadCommand,
+  HeadObjectCommand,
+  S3Client,
+  UploadPartCopyCommand,
+} from '@aws-sdk/client-s3';
 import { TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,62 +22,104 @@ describe('copyObjectWithMetadata', () => {
     s3Mock.restore();
   });
 
-  it('sends CopyObjectCommand with MetadataDirective REPLACE', async () => {
-    s3Mock.on(CopyObjectCommand).resolves({});
+  describe('Simple Copy (< 5GB)', () => {
+    it('uses simple CopyObjectCommand for small files', async () => {
+      s3Mock.on(HeadObjectCommand).resolves({
+        ContentLength: 1024 * 1024 * 100, // 100MB
+      });
+      s3Mock.on(CopyObjectCommand).resolves({});
 
-    const client = new S3Client({});
-    await copyObjectWithMetadata({
-      s3Client: client,
-      bucket: TEST_BUCKET,
-      copySource: `${TEST_BUCKET}/key.txt`,
-      key: 'key.txt',
-      acl: 'private',
-      extraParams: {},
+      const client = new S3Client({});
+      await copyObjectWithMetadata({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        copySource: `${TEST_BUCKET}/key.txt`,
+        key: 'key.txt',
+        acl: 'private',
+        extraParams: { CacheControl: 'max-age=300' },
+      });
+
+      expect(s3Mock.commandCalls(CopyObjectCommand)).toHaveLength(1);
+      const call = s3Mock.commandCalls(CopyObjectCommand)[0];
+      expect(call?.args[0].input.MetadataDirective).toBe('REPLACE');
+      expect(call?.args[0].input.CacheControl).toBe('max-age=300');
     });
-
-    const call = s3Mock.commandCalls(CopyObjectCommand)[0];
-    if (!call) throw new Error('Expected CopyObjectCommand call');
-    expect(call.args[0].input.MetadataDirective).toBe('REPLACE');
-    expect(call.args[0].input.Bucket).toBe(TEST_BUCKET);
-    expect(call.args[0].input.Key).toBe('key.txt');
-    expect(call.args[0].input.ACL).toBe('private');
-    expect(call.args[0].input.ContentType).toBeUndefined();
   });
 
-  it('includes contentType when provided', async () => {
-    s3Mock.on(CopyObjectCommand).resolves({});
+  describe('Multipart Copy (>= 5GB)', () => {
+    it('orchestrates multipart copy for large files', async () => {
+      const TWELVE_GB = 12 * 1024 * 1024 * 1024;
+      s3Mock.on(HeadObjectCommand).resolves({
+        ContentLength: TWELVE_GB,
+      });
+      s3Mock.on(CreateMultipartUploadCommand).resolves({
+        UploadId: 'upload-id-123',
+      });
+      s3Mock.on(UploadPartCopyCommand).resolves({
+        CopyPartResult: { ETag: 'etag-part' },
+      });
+      s3Mock.on(CompleteMultipartUploadCommand).resolves({});
 
-    const client = new S3Client({});
-    await copyObjectWithMetadata({
-      s3Client: client,
-      bucket: TEST_BUCKET,
-      copySource: 'b/k',
-      key: 'k',
-      acl: 'public-read',
-      contentType: 'text/html',
-      extraParams: {},
+      const client = new S3Client({});
+      await copyObjectWithMetadata({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        copySource: `${TEST_BUCKET}/large-file.zip`,
+        key: 'large-file.zip',
+        acl: 'private',
+        contentType: 'application/zip',
+        extraParams: { StorageClass: 'INTELLIGENT_TIERING' },
+      });
+
+      // 1. Check HeadObject
+      expect(s3Mock.commandCalls(HeadObjectCommand)).toHaveLength(1);
+
+      // 2. Check Multipart Init
+      expect(s3Mock.commandCalls(CreateMultipartUploadCommand)).toHaveLength(1);
+      const createCall = s3Mock.commandCalls(CreateMultipartUploadCommand)[0];
+      expect(createCall?.args[0].input.StorageClass).toBe(
+        'INTELLIGENT_TIERING',
+      );
+      expect(createCall?.args[0].input.ContentType).toBe('application/zip');
+
+      // 3. Check Parts (12GB / 500MB = 25 parts, last part is smaller)
+      const partCalls = s3Mock.commandCalls(UploadPartCopyCommand);
+      expect(partCalls).toHaveLength(25);
+      // Verify first and last part ranges
+      expect(partCalls[0]?.args[0].input.CopySourceRange).toBe(
+        'bytes=0-524287999',
+      );
+      expect(partCalls[24]?.args[0].input.CopySourceRange).toBe(
+        'bytes=12582912000-12884901887',
+      );
+
+      // 4. Check Complete
+      expect(s3Mock.commandCalls(CompleteMultipartUploadCommand)).toHaveLength(
+        1,
+      );
+      const completeCall = s3Mock.commandCalls(
+        CompleteMultipartUploadCommand,
+      )[0];
+      expect(completeCall?.args[0].input.MultipartUpload?.Parts).toHaveLength(
+        25,
+      );
     });
 
-    const call = s3Mock.commandCalls(CopyObjectCommand)[0];
-    if (!call) throw new Error('Expected CopyObjectCommand call');
-    expect(call.args[0].input.ContentType).toBe('text/html');
-  });
+    it('handles undefined ContentLength by defaulting to 0', async () => {
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: undefined });
+      s3Mock.on(CopyObjectCommand).resolves({});
 
-  it('merges extraParams', async () => {
-    s3Mock.on(CopyObjectCommand).resolves({});
+      const client = new S3Client({});
+      await copyObjectWithMetadata({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        copySource: `${TEST_BUCKET}/missing.txt`,
+        key: 'missing.txt',
+        acl: 'private',
+        extraParams: {},
+      });
 
-    const client = new S3Client({});
-    await copyObjectWithMetadata({
-      s3Client: client,
-      bucket: TEST_BUCKET,
-      copySource: 'b/k',
-      key: 'k',
-      acl: 'private',
-      extraParams: { CacheControl: 'max-age=300' },
+      expect(s3Mock.commandCalls(CopyObjectCommand)).toHaveLength(1);
     });
-
-    const call = s3Mock.commandCalls(CopyObjectCommand)[0];
-    if (!call) throw new Error('Expected CopyObjectCommand call');
-    expect(call.args[0].input.CacheControl).toBe('max-age=300');
   });
 });

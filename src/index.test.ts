@@ -11,6 +11,7 @@ import {
   CopyObjectCommand,
   DeleteObjectsCommand,
   GetBucketTaggingCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutBucketTaggingCommand,
   PutObjectCommand,
@@ -18,7 +19,6 @@ import {
 } from '@aws-sdk/client-s3';
 import type {
   AwsProviderExtended,
-  Plugin,
   RawBucketConfig,
   RawS3FerryConfig,
   S3FerryOptions,
@@ -26,7 +26,7 @@ import type {
 } from '@shared';
 import {
   mockAwsIam,
-  mockProgress,
+  mockLogging,
   mockProvider,
   TEST_BUCKET,
   TEST_STACK_NAME,
@@ -39,23 +39,8 @@ vi.mock('@core/aws/iam', () => mockAwsIam());
 // @ts-expect-error CJS module.exports is resolved at runtime by vitest
 import ServerlessS3Ferry from './index';
 
-function mockLogging() {
-  return {
-    log: {
-      error: vi.fn(),
-      notice: vi.fn(),
-      verbose: vi.fn(),
-      success: vi.fn(),
-      warning: vi.fn(),
-    },
-    progress: {
-      create: vi.fn(() => mockProgress()),
-    },
-  } as unknown as Plugin.Logging;
-}
-
 function mockServerless(
-  config: RawS3FerryConfig | RawBucketConfig[],
+  config: RawS3FerryConfig | RawBucketConfig[] | undefined,
   servicePath: string,
 ): Serverless {
   return {
@@ -170,10 +155,7 @@ describe('ServerlessS3Ferry', () => {
       const logging = mockLogging();
 
       const plugin = new ServerlessS3Ferry(
-        mockServerless(
-          { buckets: undefined } as unknown as RawS3FerryConfig,
-          tmpDir,
-        ),
+        mockServerless(undefined, tmpDir),
         {} as S3FerryOptions,
         logging,
       );
@@ -300,6 +282,7 @@ describe('ServerlessS3Ferry', () => {
         expect(execSyncSpy).toHaveBeenCalledWith('echo test', {
           stdio: 'inherit',
           timeout: 120_000,
+          cwd: tmpDir,
         });
       } finally {
         execSyncSpy.mockRestore();
@@ -370,23 +353,33 @@ describe('ServerlessS3Ferry', () => {
       expect(s3Mock.commandCalls(ListObjectsV2Command)).toHaveLength(2);
     });
 
-    it('throws error when bucketName and bucketNameKey are missing', async () => {
+    it('getBucketName resolves bucketNameKey via CloudFormation', async () => {
+      cfnMock.on(DescribeStacksCommand).resolves({
+        Stacks: [
+          {
+            StackName: TEST_STACK_NAME,
+            Outputs: [
+              { OutputKey: 'BucketRef', OutputValue: 'resolved-bucket' },
+            ],
+            CreationTime: new Date(),
+            StackStatus: 'CREATE_COMPLETE',
+          },
+        ],
+      });
+
       const plugin = new ServerlessS3Ferry(
         mockServerless([], tmpDir),
         {} as S3FerryOptions,
         mockLogging(),
       );
 
-      // Bypass visibility to reach the unreachable check in getBucketName
-      await expect(
-        (
-          plugin as unknown as {
-            getBucketName: (config: RawBucketConfig) => Promise<string>;
-          }
-        ).getBucketName({ localDir: '.' }),
-      ).rejects.toThrow(
-        'Unable to find bucketName. Please provide a value for bucketName or bucketNameKey',
-      );
+      const result = await (
+        plugin as unknown as {
+          getBucketName: (config: RawBucketConfig) => Promise<string>;
+        }
+      ).getBucketName({ localDir: '.', bucketNameKey: 'BucketRef' });
+
+      expect(result).toBe('resolved-bucket');
     });
   });
 
@@ -438,6 +431,29 @@ describe('ServerlessS3Ferry', () => {
       );
     });
 
+    it('logs notice when s3Ferry config is empty and clear is called', async () => {
+      const logging = mockLogging();
+      const serverless = mockServerless(undefined, tmpDir);
+      // Ensure custom.s3Ferry is actually undefined or missing
+      const custom = serverless.service.custom as Record<string, unknown>;
+      delete custom['s3Ferry'];
+
+      const plugin = new ServerlessS3Ferry(
+        serverless,
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      await plugin.clear();
+      const log = logging.log as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      expect(log['notice']).toHaveBeenCalledWith(
+        expect.stringContaining('No configuration found'),
+      );
+    });
+
     it('skips disabled bucket', async () => {
       const plugin = new ServerlessS3Ferry(
         mockServerless(
@@ -458,6 +474,7 @@ describe('ServerlessS3Ferry', () => {
     it('copies objects with metadata params', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const plugin = new ServerlessS3Ferry(
@@ -487,6 +504,7 @@ describe('ServerlessS3Ferry', () => {
     it('ignores files with mismatched OnlyForStage', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const plugin = new ServerlessS3Ferry(
@@ -542,6 +560,7 @@ describe('ServerlessS3Ferry', () => {
     it('filters by --bucket option', async () => {
       fs.writeFileSync(path.join(tmpDir, 'file.css'), 'body{}');
 
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const plugin = new ServerlessS3Ferry(
@@ -708,6 +727,7 @@ describe('ServerlessS3Ferry', () => {
   describe('hook: s3ferry:metadata logs success', () => {
     it('logs success when invoked as command', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const logging = mockLogging();
@@ -827,6 +847,23 @@ describe('ServerlessS3Ferry', () => {
 
       // If we got here without error, offline was set correctly
       expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+    });
+
+    it('reuses cached S3 client', async () => {
+      const logging = mockLogging();
+      const plugin = new ServerlessS3Ferry(
+        mockServerless([{ bucketName: TEST_BUCKET, localDir: '.' }], tmpDir),
+        {} as S3FerryOptions,
+        logging,
+      );
+
+      const internalPlugin = plugin as unknown as { getS3Client(): S3Client };
+      // Trigger client creation
+      const client1 = internalPlugin.getS3Client();
+      // Access again
+      const client2 = internalPlugin.getS3Client();
+
+      expect(client1).toBe(client2);
     });
   });
 
@@ -969,6 +1006,7 @@ describe('ServerlessS3Ferry', () => {
 
     it('s3ferry:bucket:metadata runs syncMetadata', async () => {
       fs.writeFileSync(path.join(tmpDir, 'index.html'), '<h1>hello</h1>');
+      s3Mock.on(HeadObjectCommand).resolves({ ContentLength: 100 });
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const logging = mockLogging();
