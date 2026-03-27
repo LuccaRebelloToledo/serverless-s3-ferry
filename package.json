@@ -32,41 +32,43 @@
     "dist/"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "build": "npm run clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "check": "npx @biomejs/biome check --write ./src",
+    "lint": "npx @biomejs/biome check --write ./src",
+    "check-types": "tsc --noEmit",
     "prepare": "husky || true"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "^3.993.0",
-    "@aws-sdk/client-s3": "^3.993.0",
+    "@aws-sdk/client-cloudformation": "^3.1018.0",
+    "@aws-sdk/client-s3": "^3.1018.0",
     "mime": "^4.1.0",
-    "minimatch": "^10.2.0",
+    "minimatch": "^10.2.4",
     "p-limit": "^3.1.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.15",
-    "@types/node": "^25.2.3",
+    "@biomejs/biome": "2.4.9",
+    "@types/node": "^25.5.0",
     "@types/serverless": "^3.12.28",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.2",
     "aws-sdk-client-mock": "^4.1.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
+    "lint-staged": "^16.4.0",
     "tsc-alias": "^1.8.16",
-    "typescript": "^5.7.0",
-    "vitest": "^4.0.18"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
   },
   "publishConfig": {
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,json,md}": [
-      "npm run check"
+      "npm run lint"
     ]
   }
 }

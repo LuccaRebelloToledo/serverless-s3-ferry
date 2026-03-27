@@ -3,7 +3,7 @@ import type Plugin from 'serverless/classes/Plugin';
 import type Aws from 'serverless/plugins/aws/provider/awsProvider';
 
 // Re-export the library types that we use directly
-export type { Serverless, Plugin, Aws };
+export type { Aws, Plugin, Serverless };
 
 export interface ErrorLogger {
   error(message: string): void;
