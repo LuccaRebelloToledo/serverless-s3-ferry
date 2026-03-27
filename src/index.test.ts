@@ -381,9 +381,11 @@ describe('ServerlessS3Ferry', () => {
       await expect(
         (
           plugin as unknown as {
-            getBucketName: (config: RawBucketConfig) => Promise<string>;
+            core: {
+              getBucketName: (config: RawBucketConfig) => Promise<string>;
+            };
           }
-        ).getBucketName({ localDir: '.' }),
+        ).core.getBucketName({ localDir: '.' }),
       ).rejects.toThrow(
         'Unable to find bucketName. Please provide a value for bucketName or bucketNameKey',
       );
