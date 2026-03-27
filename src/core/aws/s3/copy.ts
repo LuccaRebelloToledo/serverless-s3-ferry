@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import type { S3Params } from '@shared';
 
-export interface CopyObjectOptions {
+interface CopyObjectOptions {
   s3Client: S3Client;
   bucket: string;
   copySource: string;

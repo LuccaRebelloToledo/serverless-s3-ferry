@@ -64,10 +64,13 @@ export function buildParamMatchers(params: ParamEntry[]): ParamMatcher[] {
     .filter((matcher): matcher is ParamMatcher => !!matcher);
 }
 
-export function getNoSync(
-  rawConfig: RawS3FerryConfig | RawBucketConfig[],
-  optionNoSync?: boolean,
-): boolean {
+interface GetNoSyncOptions {
+  rawConfig: RawS3FerryConfig | RawBucketConfig[];
+  optionNoSync?: boolean;
+}
+
+export function getNoSync(options: GetNoSyncOptions): boolean {
+  const { rawConfig, optionNoSync } = options;
   if (optionNoSync) {
     return true;
   }

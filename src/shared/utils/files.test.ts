@@ -20,7 +20,7 @@ describe('getLocalFiles', () => {
     fs.writeFileSync(path.join(tmpDir, 'a.txt'), 'a');
     fs.writeFileSync(path.join(tmpDir, 'sub', 'b.txt'), 'b');
 
-    const files = getLocalFiles(tmpDir);
+    const files = getLocalFiles({ dir: tmpDir });
     const names = files.map((f) => path.relative(tmpDir, f)).sort();
     expect(names).toEqual(['a.txt', path.join('sub', 'b.txt')]);
   });
@@ -33,7 +33,7 @@ describe('getLocalFiles', () => {
     );
 
     const log = { error: vi.fn(), warning: vi.fn() };
-    const files = getLocalFiles(tmpDir, log);
+    const files = getLocalFiles({ dir: tmpDir, log });
 
     expect(files).toHaveLength(1);
     expect(log.warning).toHaveBeenCalledWith(
@@ -43,7 +43,7 @@ describe('getLocalFiles', () => {
 
   it('returns empty array for non-existent directory', () => {
     const log = { error: vi.fn(), warning: vi.fn() };
-    const files = getLocalFiles('/nonexistent/path', log);
+    const files = getLocalFiles({ dir: '/nonexistent/path', log });
     expect(files).toEqual([]);
     expect(log.error).toHaveBeenCalledWith(
       expect.stringContaining('/nonexistent/path'),
@@ -64,7 +64,7 @@ describe('getLocalFiles', () => {
 
     try {
       const log = { error: vi.fn(), warning: vi.fn() };
-      const files = getLocalFiles(tmpDir, log);
+      const files = getLocalFiles({ dir: tmpDir, log });
 
       expect(files).toHaveLength(1);
       expect(files[0]).toContain('readable.txt');
@@ -77,7 +77,7 @@ describe('getLocalFiles', () => {
   });
 
   it('returns empty array for empty directory', () => {
-    const files = getLocalFiles(tmpDir);
+    const files = getLocalFiles({ dir: tmpDir });
     expect(files).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import {
   DEFAULT_REGION,
 } from '@shared';
 
-export interface AwsClientOptions {
+interface AwsClientOptions {
   region: string;
   credentials?: AwsCredentials;
 }

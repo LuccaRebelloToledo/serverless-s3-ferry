@@ -2,13 +2,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ErrorLogger } from '@shared';
 
-export function getLocalFiles(dir: string, log?: ErrorLogger): string[] {
+interface GetLocalFilesOptions {
+  dir: string;
+  log?: ErrorLogger;
+}
+
+export function getLocalFiles(options: GetLocalFilesOptions): string[] {
+  const { dir, log } = options;
   const files: string[] = [];
-  collectFiles(dir, files, log);
+  collectFiles({ dir, files, log });
   return files;
 }
 
-function collectFiles(dir: string, files: string[], log?: ErrorLogger): void {
+interface CollectFilesOptions {
+  dir: string;
+  files: string[];
+  log?: ErrorLogger;
+}
+
+function collectFiles(options: CollectFilesOptions): void {
+  const { dir, files, log } = options;
   try {
     fs.accessSync(dir, fs.constants.R_OK);
   } catch {
@@ -33,7 +46,7 @@ function collectFiles(dir: string, files: string[], log?: ErrorLogger): void {
     }
 
     if (stat.isDirectory()) {
-      collectFiles(fullPath, files, log);
+      collectFiles({ dir: fullPath, files, log });
     } else {
       files.push(fullPath);
     }

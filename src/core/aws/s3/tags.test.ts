@@ -11,7 +11,10 @@ import { mergeTags, updateBucketTags } from './tags';
 describe('mergeTags', () => {
   it('adds new tags', () => {
     const existing = [{ Key: 'a', Value: '1' }];
-    mergeTags(existing, [{ Key: 'b', Value: '2' }]);
+    mergeTags({
+      existingTagSet: existing,
+      tagsToMerge: [{ Key: 'b', Value: '2' }],
+    });
     expect(existing).toEqual([
       { Key: 'a', Value: '1' },
       { Key: 'b', Value: '2' },
@@ -20,13 +23,16 @@ describe('mergeTags', () => {
 
   it('updates existing tags', () => {
     const existing = [{ Key: 'a', Value: '1' }];
-    mergeTags(existing, [{ Key: 'a', Value: '99' }]);
+    mergeTags({
+      existingTagSet: existing,
+      tagsToMerge: [{ Key: 'a', Value: '99' }],
+    });
     expect(existing).toEqual([{ Key: 'a', Value: '99' }]);
   });
 
   it('handles empty tagsToMerge', () => {
     const existing = [{ Key: 'a', Value: '1' }];
-    mergeTags(existing, []);
+    mergeTags({ existingTagSet: existing, tagsToMerge: [] });
     expect(existing).toEqual([{ Key: 'a', Value: '1' }]);
   });
 });
@@ -49,7 +55,11 @@ describe('updateBucketTags', () => {
     s3Mock.on(PutBucketTaggingCommand).resolves({});
 
     const client = new S3Client({});
-    await updateBucketTags(client, TEST_BUCKET, [{ Key: 'new', Value: 'tag' }]);
+    await updateBucketTags({
+      s3Client: client,
+      bucket: TEST_BUCKET,
+      tagsToUpdate: [{ Key: 'new', Value: 'tag' }],
+    });
 
     const putCall = s3Mock.commandCalls(PutBucketTaggingCommand)[0];
     if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
@@ -67,7 +77,11 @@ describe('updateBucketTags', () => {
     s3Mock.on(PutBucketTaggingCommand).resolves({});
 
     const client = new S3Client({});
-    await updateBucketTags(client, TEST_BUCKET, [{ Key: 'new', Value: 'tag' }]);
+    await updateBucketTags({
+      s3Client: client,
+      bucket: TEST_BUCKET,
+      tagsToUpdate: [{ Key: 'new', Value: 'tag' }],
+    });
 
     const putCall = s3Mock.commandCalls(PutBucketTaggingCommand)[0];
     if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
@@ -84,7 +98,11 @@ describe('updateBucketTags', () => {
     s3Mock.on(PutBucketTaggingCommand).resolves({});
 
     const client = new S3Client({});
-    await updateBucketTags(client, TEST_BUCKET, [{ Key: 'new', Value: 'tag' }]);
+    await updateBucketTags({
+      s3Client: client,
+      bucket: TEST_BUCKET,
+      tagsToUpdate: [{ Key: 'new', Value: 'tag' }],
+    });
 
     const putCall = s3Mock.commandCalls(PutBucketTaggingCommand)[0];
     if (!putCall) throw new Error('Expected PutBucketTaggingCommand call');
@@ -98,7 +116,11 @@ describe('updateBucketTags', () => {
 
     const client = new S3Client({});
     await expect(
-      updateBucketTags(client, TEST_BUCKET, [{ Key: 'a', Value: 'b' }]),
+      updateBucketTags({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        tagsToUpdate: [{ Key: 'a', Value: 'b' }],
+      }),
     ).rejects.toThrow('AccessDenied');
   });
 });

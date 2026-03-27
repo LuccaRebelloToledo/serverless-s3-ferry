@@ -1,11 +1,16 @@
 import { ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3';
 import type { S3Object } from '@shared';
 
+interface ListAllObjectsOptions {
+  s3Client: S3Client;
+  bucket: string;
+  prefix: string;
+}
+
 export async function listAllObjects(
-  s3Client: S3Client,
-  bucket: string,
-  prefix: string,
+  options: ListAllObjectsOptions,
 ): Promise<S3Object[]> {
+  const { s3Client, bucket, prefix } = options;
   const objects: S3Object[] = [];
   let continuationToken: string | undefined;
 

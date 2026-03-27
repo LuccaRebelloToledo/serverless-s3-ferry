@@ -24,7 +24,7 @@ import pLimit from 'p-limit';
 import { deleteObjectsByKeys } from './delete';
 import { listAllObjects } from './list';
 
-export interface UploadDirectoryOptions extends UploadDirOptions {
+interface UploadDirectoryOptions extends UploadDirOptions {
   s3Client: S3Client;
   progress: Plugin.Progress;
   servicePath: string;
@@ -42,12 +42,15 @@ function computeMD5(content: Buffer): string {
   return `"${crypto.createHash('md5').update(content).digest('hex')}"`;
 }
 
-function resolveS3Params(
-  localFile: string,
-  localDir: string,
-  params?: ParamMatcher[],
-  stage?: string,
-): S3Params | null {
+interface ResolveS3ParamsOptions {
+  localFile: string;
+  localDir: string;
+  params?: ParamMatcher[];
+  stage?: string;
+}
+
+function resolveS3Params(options: ResolveS3ParamsOptions): S3Params | null {
+  const { localFile, localDir, params, stage } = options;
   if (!params || params.length === 0) {
     return {};
   }
@@ -91,8 +94,8 @@ export async function uploadDirectory(
     log,
   } = options;
 
-  const localFiles = getLocalFiles(localDir, log);
-  const remoteObjects = await listAllObjects(s3Client, bucket, prefix);
+  const localFiles = getLocalFiles({ dir: localDir, log });
+  const remoteObjects = await listAllObjects({ s3Client, bucket, prefix });
 
   // Build a map of remote objects by key for quick lookup
   const remoteByKey = new Map<string, S3Object>();
@@ -113,7 +116,7 @@ export async function uploadDirectory(
     localKeys.add(s3Key);
 
     // Resolve per-file S3 params (may return null to skip)
-    const s3Params = resolveS3Params(localFile, localDir, params, stage);
+    const s3Params = resolveS3Params({ localFile, localDir, params, stage });
     if (s3Params === null) {
       continue;
     }
@@ -135,10 +138,11 @@ export async function uploadDirectory(
     filesToProcess.length + (keysToDelete.length > 0 ? 1 : 0);
   let completedOperations = 0;
 
-  const tracker = createProgressTracker(
-    progress,
-    (percent) => `${localDir}: sync with bucket ${bucket} (${percent}%)`,
-  );
+  const tracker = createProgressTracker({
+    progressEntry: progress,
+    buildMessage: (percent) =>
+      `${localDir}: sync with bucket ${bucket} (${percent}%)`,
+  });
 
   // Read, compare MD5, and upload in a single pass per file (inside pLimit)
   // Only maxConcurrency file buffers are in memory at any given time
@@ -181,7 +185,7 @@ export async function uploadDirectory(
 
   // Delete removed files
   if (keysToDelete.length > 0) {
-    await deleteObjectsByKeys(s3Client, bucket, keysToDelete);
+    await deleteObjectsByKeys({ s3Client, bucket, keys: keysToDelete });
     completedOperations++;
     tracker.update(completedOperations, totalOperations);
   }

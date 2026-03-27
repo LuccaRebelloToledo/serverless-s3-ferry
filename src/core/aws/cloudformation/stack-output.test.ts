@@ -39,10 +39,10 @@ describe('resolveStackOutput', () => {
       ],
     });
 
-    const result = await resolveStackOutput(
-      mockProvider() as unknown as AwsProviderExtended,
-      'BucketName',
-    );
+    const result = await resolveStackOutput({
+      provider: mockProvider() as unknown as AwsProviderExtended,
+      outputKey: 'BucketName',
+    });
     expect(result).toBe(TEST_BUCKET);
   });
 
@@ -59,17 +59,17 @@ describe('resolveStackOutput', () => {
     });
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'Missing',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'Missing',
+      }),
     ).rejects.toThrow(StackOutputError);
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'Missing',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'Missing',
+      }),
     ).rejects.toThrow(
       `Output key 'Missing' not found in stack '${TEST_STACK_NAME}'`,
     );
@@ -79,17 +79,17 @@ describe('resolveStackOutput', () => {
     cfnMock.on(DescribeStacksCommand).resolves({ Stacks: [] });
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'BucketName',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(StackOutputError);
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'BucketName',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(
       `Failed to resolve stack output 'BucketName' in stack '${TEST_STACK_NAME}'`,
     );
@@ -98,17 +98,17 @@ describe('resolveStackOutput', () => {
     cfnMock.on(DescribeStacksCommand).resolves({});
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'BucketName',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(StackOutputError);
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'BucketName',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(
       `Failed to resolve stack output 'BucketName' in stack '${TEST_STACK_NAME}'`,
     );
@@ -126,17 +126,17 @@ describe('resolveStackOutput', () => {
     });
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'BucketName',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(StackOutputError);
 
     await expect(
-      resolveStackOutput(
-        mockProvider() as unknown as AwsProviderExtended,
-        'BucketName',
-      ),
+      resolveStackOutput({
+        provider: mockProvider() as unknown as AwsProviderExtended,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(
       `Failed to resolve stack output 'BucketName' in stack '${TEST_STACK_NAME}'`,
     );
@@ -149,11 +149,17 @@ describe('resolveStackOutput', () => {
     } as unknown as AwsProviderExtended;
 
     await expect(
-      resolveStackOutput(providerWithoutStackName, 'BucketName'),
+      resolveStackOutput({
+        provider: providerWithoutStackName,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(StackOutputError);
 
     await expect(
-      resolveStackOutput(providerWithoutStackName, 'BucketName'),
+      resolveStackOutput({
+        provider: providerWithoutStackName,
+        outputKey: 'BucketName',
+      }),
     ).rejects.toThrow(
       "Failed to resolve stack output 'BucketName': stack name not found",
     );

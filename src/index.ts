@@ -192,7 +192,10 @@ class ServerlessS3Ferry implements Plugin {
   }
 
   private shouldSkipSync(): boolean {
-    return getNoSync(this.getS3FerryConfig(), this.options.nos3ferry);
+    return getNoSync({
+      rawConfig: this.getS3FerryConfig(),
+      optionNoSync: this.options.nos3ferry,
+    });
   }
 
   private getS3Client() {
@@ -217,7 +220,10 @@ class ServerlessS3Ferry implements Plugin {
 
     if (config.bucketNameKey) {
       const provider = this.getProvider();
-      return resolveStackOutput(provider, config.bucketNameKey);
+      return resolveStackOutput({
+        provider,
+        outputKey: config.bucketNameKey,
+      });
     }
 
     throw new ConfigValidationError(
@@ -444,7 +450,11 @@ class ServerlessS3Ferry implements Plugin {
         });
 
         try {
-          await updateBucketTags(this.getS3Client(), bucketName, tagsToUpdate);
+          await updateBucketTags({
+            s3Client: this.getS3Client(),
+            bucket: bucketName,
+            tagsToUpdate,
+          });
         } finally {
           bucketProgress.remove();
         }

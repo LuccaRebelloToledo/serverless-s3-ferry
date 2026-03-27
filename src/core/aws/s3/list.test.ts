@@ -26,7 +26,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toHaveLength(2);
       const first = result[0];
@@ -51,7 +55,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, 'assets/');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: 'assets/',
+      });
 
       expect(result).toHaveLength(1);
       const first = result[0];
@@ -80,7 +88,11 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toHaveLength(2);
       const first = result[0];
@@ -109,7 +121,11 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toHaveLength(3);
       expect(result.map((obj) => obj.Key)).toEqual([
@@ -133,7 +149,11 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      await listAllObjects(client, TEST_BUCKET, '');
+      await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       const calls = s3Mock.commandCalls(ListObjectsV2Command);
       expect(calls).toHaveLength(2);
@@ -165,7 +185,11 @@ describe('listAllObjects', () => {
         });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toHaveLength(1001);
       const first = result[0];
@@ -184,7 +208,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toEqual([]);
     });
@@ -195,7 +223,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toEqual([]);
     });
@@ -210,7 +242,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toHaveLength(1);
       const first = result[0];
@@ -228,7 +264,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       expect(result).toHaveLength(2);
 
@@ -249,7 +289,11 @@ describe('listAllObjects', () => {
       });
 
       const client = new S3Client({});
-      const result = await listAllObjects(client, TEST_BUCKET, '');
+      const result = await listAllObjects({
+        s3Client: client,
+        bucket: TEST_BUCKET,
+        prefix: '',
+      });
 
       const r0 = result[0];
       const r1 = result[1];

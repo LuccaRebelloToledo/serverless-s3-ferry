@@ -5,7 +5,13 @@ import {
 } from '@aws-sdk/client-s3';
 import type { Tag } from '@shared';
 
-export function mergeTags(existingTagSet: Tag[], tagsToMerge: Tag[]): void {
+interface MergeTagsOptions {
+  existingTagSet: Tag[];
+  tagsToMerge: Tag[];
+}
+
+export function mergeTags(options: MergeTagsOptions): void {
+  const { existingTagSet, tagsToMerge } = options;
   for (const tag of tagsToMerge) {
     const existing = existingTagSet.find((et) => et.Key === tag.Key);
     if (existing) {
@@ -16,11 +22,16 @@ export function mergeTags(existingTagSet: Tag[], tagsToMerge: Tag[]): void {
   }
 }
 
+interface UpdateBucketTagsOptions {
+  s3Client: S3Client;
+  bucket: string;
+  tagsToUpdate: Tag[];
+}
+
 export async function updateBucketTags(
-  s3Client: S3Client,
-  bucket: string,
-  tagsToUpdate: Tag[],
+  options: UpdateBucketTagsOptions,
 ): Promise<void> {
+  const { s3Client, bucket, tagsToUpdate } = options;
   let existingTagSet: Tag[] = [];
 
   try {
@@ -37,7 +48,7 @@ export async function updateBucketTags(
     }
   }
 
-  mergeTags(existingTagSet, tagsToUpdate);
+  mergeTags({ existingTagSet, tagsToMerge: tagsToUpdate });
 
   await s3Client.send(
     new PutBucketTaggingCommand({

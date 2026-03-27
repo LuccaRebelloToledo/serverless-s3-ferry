@@ -5,10 +5,15 @@ import {
 import { getAwsOptions } from '@core/aws/iam';
 import { type AwsProviderExtended, StackOutputError } from '@shared';
 
+interface ResolveStackOutputOptions {
+  provider: AwsProviderExtended;
+  outputKey: string;
+}
+
 export async function resolveStackOutput(
-  provider: AwsProviderExtended,
-  outputKey: string,
+  options: ResolveStackOutputOptions,
 ): Promise<string> {
+  const { provider, outputKey } = options;
   const awsOptions = getAwsOptions(provider);
   const cfn = new CloudFormationClient({
     region: awsOptions.region,

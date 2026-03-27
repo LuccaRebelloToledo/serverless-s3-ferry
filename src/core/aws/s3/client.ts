@@ -2,7 +2,7 @@ import { S3Client, type S3ClientConfig } from '@aws-sdk/client-s3';
 import { getAwsOptions } from '@core/aws/iam';
 import type { AwsProviderExtended } from '@shared';
 
-export interface CreateS3ClientOptions {
+interface CreateS3ClientOptions {
   provider: AwsProviderExtended;
   endpoint?: string | null;
   offline?: boolean;

@@ -114,21 +114,21 @@ describe('buildParamMatchers', () => {
 
 describe('getNoSync', () => {
   it('returns true when optionNoSync is true', () => {
-    expect(getNoSync([], true)).toBe(true);
+    expect(getNoSync({ rawConfig: [], optionNoSync: true })).toBe(true);
   });
 
   it('returns false for array config', () => {
-    expect(getNoSync([])).toBe(false);
+    expect(getNoSync({ rawConfig: [] })).toBe(false);
   });
 
   it('handles string "TRUE" case-insensitive', () => {
-    expect(getNoSync({ noSync: 'TRUE' })).toBe(true);
-    expect(getNoSync({ noSync: 'true' })).toBe(true);
-    expect(getNoSync({ noSync: 'True' })).toBe(true);
+    expect(getNoSync({ rawConfig: { noSync: 'TRUE' } })).toBe(true);
+    expect(getNoSync({ rawConfig: { noSync: 'true' } })).toBe(true);
+    expect(getNoSync({ rawConfig: { noSync: 'True' } })).toBe(true);
   });
 
   it('defaults to false', () => {
-    expect(getNoSync({})).toBe(false);
+    expect(getNoSync({ rawConfig: {} })).toBe(false);
   });
 });
 

@@ -16,7 +16,7 @@ import { minimatch } from 'minimatch';
 import pLimit from 'p-limit';
 import { copyObjectWithMetadata } from './copy';
 
-export interface SyncMetadataOptions {
+interface SyncMetadataOptions {
   s3Client: S3Client;
   localDir: string;
   bucket: string;
@@ -52,7 +52,7 @@ export async function syncDirectoryMetadata(
 
   const fileMap = new Map<string, FileToSync>();
   const ignored = new Set<string>(['.DS_Store']);
-  const files = getLocalFiles(localDir, log);
+  const files = getLocalFiles({ dir: localDir, log });
 
   for (const param of params) {
     const glob = Object.keys(param)[0];

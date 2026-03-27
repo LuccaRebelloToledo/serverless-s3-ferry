@@ -1,9 +1,15 @@
 import type { Plugin } from '@shared';
 
-export function createProgressTracker(
-  progressEntry: Plugin.Progress,
-  buildMessage: (percent: number) => string,
-): { update(amount: number, total: number): void; remove(): void } {
+interface CreateProgressTrackerOptions {
+  progressEntry: Plugin.Progress;
+  buildMessage: (percent: number) => string;
+}
+
+export function createProgressTracker(options: CreateProgressTrackerOptions): {
+  update(amount: number, total: number): void;
+  remove(): void;
+} {
+  const { progressEntry, buildMessage } = options;
   let percent = 0;
 
   return {

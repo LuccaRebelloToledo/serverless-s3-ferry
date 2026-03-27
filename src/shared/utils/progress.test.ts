@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 describe('createProgressTracker', () => {
   it('updates in 10% increments', () => {
     const progress = mockProgress();
-    const tracker = createProgressTracker(progress, (p) => `${p}%`);
+    const tracker = createProgressTracker({
+      progressEntry: progress,
+      buildMessage: (p) => `${p}%`,
+    });
 
     tracker.update(1, 10); // 10%
     tracker.update(2, 10); // 20%
@@ -19,7 +22,10 @@ describe('createProgressTracker', () => {
 
   it('does not update for same percentage', () => {
     const progress = mockProgress();
-    const tracker = createProgressTracker(progress, (p) => `${p}%`);
+    const tracker = createProgressTracker({
+      progressEntry: progress,
+      buildMessage: (p) => `${p}%`,
+    });
 
     tracker.update(1, 10); // 10%
     tracker.update(1, 10); // still 10%, no update
@@ -29,7 +35,10 @@ describe('createProgressTracker', () => {
 
   it('does nothing when total is 0', () => {
     const progress = mockProgress();
-    const tracker = createProgressTracker(progress, (p) => `${p}%`);
+    const tracker = createProgressTracker({
+      progressEntry: progress,
+      buildMessage: (p) => `${p}%`,
+    });
 
     tracker.update(5, 0);
 
@@ -38,7 +47,10 @@ describe('createProgressTracker', () => {
 
   it('remove() calls progressEntry.remove()', () => {
     const progress = mockProgress();
-    const tracker = createProgressTracker(progress, (p) => `${p}%`);
+    const tracker = createProgressTracker({
+      progressEntry: progress,
+      buildMessage: (p) => `${p}%`,
+    });
 
     tracker.remove();
 
