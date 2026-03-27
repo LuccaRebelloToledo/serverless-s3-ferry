@@ -8,9 +8,11 @@ import {
 } from '@aws-sdk/client-s3';
 import {
   createProgressTracker,
+  DEFAULT_CONTENT_TYPE,
   DEFAULT_MAX_CONCURRENCY,
   type ErrorLogger,
   getLocalFiles,
+  ONLY_FOR_STAGE_KEY,
   type ParamMatcher,
   type Plugin,
   type S3Object,
@@ -61,13 +63,13 @@ function resolveS3Params(options: ResolveS3ParamsOptions): S3Params | null {
   for (const param of params) {
     if (minimatch(localFile, `${path.resolve(localDir)}/${param.glob}`)) {
       Object.assign(s3Params, param.params);
-      if (s3Params['OnlyForStage']) {
-        onlyForStage = s3Params['OnlyForStage'];
+      if (s3Params[ONLY_FOR_STAGE_KEY]) {
+        onlyForStage = s3Params[ONLY_FOR_STAGE_KEY];
       }
     }
   }
 
-  delete s3Params['OnlyForStage'];
+  delete s3Params[ONLY_FOR_STAGE_KEY];
 
   if (onlyForStage && onlyForStage !== stage) {
     return null; // skip this file
@@ -164,7 +166,7 @@ export async function uploadDirectory(
         const contentType =
           mime.getType(entry.localPath) ??
           defaultContentType ??
-          'application/octet-stream';
+          DEFAULT_CONTENT_TYPE;
 
         const putParams: PutObjectCommandInput = {
           Bucket: bucket,

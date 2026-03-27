@@ -20,13 +20,18 @@ import {
   getCustomHooks,
   getEndpoint,
   getNoSync,
+  IS_OFFLINE_ENV,
+  PLUGIN_KEY,
   type Plugin,
+  PRE_COMMAND_TIMEOUT,
+  PROVIDER_NAME,
   parseBucketConfig,
   type RawBucketConfig,
   type RawS3FerryConfig,
   type S3FerryOptions,
   type Serverless,
   type Tag,
+  TRUE_STRING,
 } from '@shared';
 
 class ServerlessS3Ferry implements Plugin {
@@ -51,7 +56,7 @@ class ServerlessS3Ferry implements Plugin {
     this.log = logging.log;
     this.progress = logging.progress;
     this.servicePath = this.serverless.service.serverless.config.servicePath;
-    this.offline = String(this.options.offline).toUpperCase() === 'TRUE';
+    this.offline = String(this.options.offline).toUpperCase() === TRUE_STRING;
 
     this.commands = {
       s3ferry: {
@@ -178,15 +183,15 @@ class ServerlessS3Ferry implements Plugin {
   }
 
   private isOffline(): boolean {
-    return this.offline || !!env['IS_OFFLINE'];
+    return this.offline || !!env[IS_OFFLINE_ENV];
   }
 
   private getProvider(): AwsProviderExtended {
-    return this.serverless.getProvider('aws') as AwsProviderExtended;
+    return this.serverless.getProvider(PROVIDER_NAME) as AwsProviderExtended;
   }
 
   private getS3FerryConfig(): RawS3FerryConfig | RawBucketConfig[] {
-    return this.serverless.service.custom['s3Ferry'] as
+    return this.serverless.service.custom[PLUGIN_KEY] as
       | RawS3FerryConfig
       | RawBucketConfig[];
   }
@@ -271,7 +276,7 @@ class ServerlessS3Ferry implements Plugin {
             bucketProgress.update(`${localDir}: running pre-command...`);
             child_process.execSync(config.preCommand, {
               stdio: 'inherit',
-              timeout: 120_000,
+              timeout: PRE_COMMAND_TIMEOUT,
             });
           }
 

@@ -3,7 +3,7 @@ import {
   PutBucketTaggingCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import type { Tag } from '@shared';
+import { S3_NO_SUCH_TAG_SET, type Tag } from '@shared';
 
 interface MergeTagsOptions {
   existingTagSet: Tag[];
@@ -41,7 +41,7 @@ export async function updateBucketTags(
     existingTagSet = (data.TagSet as Tag[]) ?? [];
   } catch (err: unknown) {
     // If there are no tags, S3 throws NoSuchTagSet — that's fine, start fresh
-    if (err instanceof Error && err.name === 'NoSuchTagSet') {
+    if (err instanceof Error && err.name === S3_NO_SUCH_TAG_SET) {
       existingTagSet = [];
     } else {
       throw err;

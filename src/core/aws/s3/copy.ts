@@ -4,7 +4,7 @@ import {
   type ObjectCannedACL,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import type { S3Params } from '@shared';
+import { S3_METADATA_DIRECTIVE_REPLACE, type S3Params } from '@shared';
 
 interface CopyObjectOptions {
   s3Client: S3Client;
@@ -28,7 +28,7 @@ export async function copyObjectWithMetadata(
     Key: key,
     Bucket: bucket,
     ACL: acl,
-    MetadataDirective: 'REPLACE',
+    MetadataDirective: S3_METADATA_DIRECTIVE_REPLACE,
   };
 
   if (contentType) {

@@ -1,4 +1,4 @@
-import type { Plugin } from '@shared';
+import { type Plugin, PROGRESS_STEP } from '@shared';
 
 interface CreateProgressTrackerOptions {
   progressEntry: Plugin.Progress;
@@ -15,7 +15,8 @@ export function createProgressTracker(options: CreateProgressTrackerOptions): {
   return {
     update(amount: number, total: number) {
       if (total === 0) return;
-      const current = Math.round((amount / total) * 10) * 10;
+      const current =
+        Math.round((amount / total) * PROGRESS_STEP) * PROGRESS_STEP;
       if (current > percent) {
         percent = current;
         progressEntry.update(buildMessage(percent));

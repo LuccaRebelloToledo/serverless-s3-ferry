@@ -11,10 +11,9 @@ interface AwsClientOptions {
 
 export function getAwsOptions(provider: AwsProviderExtended): AwsClientOptions {
   if (
-    provider.cachedCredentials &&
-    typeof provider.cachedCredentials.accessKeyId !== 'undefined' &&
-    typeof provider.cachedCredentials.secretAccessKey !== 'undefined' &&
-    typeof provider.cachedCredentials.sessionToken !== 'undefined'
+    provider.cachedCredentials?.accessKeyId &&
+    provider.cachedCredentials.secretAccessKey &&
+    provider.cachedCredentials.sessionToken
   ) {
     return {
       region: provider.getRegion(),

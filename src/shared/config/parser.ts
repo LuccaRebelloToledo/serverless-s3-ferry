@@ -7,6 +7,7 @@ import {
   type RawBucketConfig,
   type RawS3FerryConfig,
   type S3Params,
+  TRUE_STRING,
 } from '@shared';
 
 export function getBucketConfigs(
@@ -78,7 +79,7 @@ export function getNoSync(options: GetNoSyncOptions): boolean {
     return false;
   }
   const noSync = rawConfig.noSync ?? false;
-  return String(noSync).toUpperCase() === 'TRUE';
+  return String(noSync).toUpperCase() === TRUE_STRING;
 }
 
 export function getEndpoint(

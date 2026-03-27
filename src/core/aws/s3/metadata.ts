@@ -7,6 +7,8 @@ import {
   extractMetaParams,
   type FileToSync,
   getLocalFiles,
+  IGNORED_FILES,
+  ONLY_FOR_STAGE_KEY,
   type ParamEntry,
   type Plugin,
   toS3Path,
@@ -51,7 +53,7 @@ export async function syncDirectoryMetadata(
   }
 
   const fileMap = new Map<string, FileToSync>();
-  const ignored = new Set<string>(['.DS_Store']);
+  const ignored = new Set<string>(IGNORED_FILES);
   const files = getLocalFiles({ dir: localDir, log });
 
   for (const param of params) {
@@ -66,14 +68,14 @@ export async function syncDirectoryMetadata(
       if (ignored.has(match)) continue;
       const matchParams = extractMetaParams(param);
       if (
-        matchParams['OnlyForStage'] &&
-        matchParams['OnlyForStage'] !== stage
+        matchParams[ONLY_FOR_STAGE_KEY] &&
+        matchParams[ONLY_FOR_STAGE_KEY] !== stage
       ) {
         ignored.add(match);
         fileMap.delete(match);
         continue;
       }
-      delete matchParams['OnlyForStage'];
+      delete matchParams[ONLY_FOR_STAGE_KEY];
       fileMap.set(match, { name: match, params: matchParams });
     }
   }
