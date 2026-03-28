@@ -3,14 +3,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectsCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } from '@aws-sdk/client-s3';
-import { mockProgress, TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uploadDirectory } from './upload';
 
 function md5Etag(content: string): string {
@@ -37,7 +42,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -67,7 +72,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -92,7 +97,7 @@ describe('uploadDirectory', () => {
       Contents: [{ Key: 'file.txt', ETag: md5Etag(content) }],
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -114,7 +119,7 @@ describe('uploadDirectory', () => {
     });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -140,7 +145,7 @@ describe('uploadDirectory', () => {
       Contents: [{ Key: 'old.txt', ETag: '"abc"' }],
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -161,7 +166,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -196,7 +201,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(PutObjectCommand).resolves({});
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -232,7 +237,7 @@ describe('uploadDirectory', () => {
     });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -260,7 +265,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -298,7 +303,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -321,7 +326,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -344,7 +349,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -369,7 +374,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -400,7 +405,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(PutObjectCommand).resolves({});
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -428,7 +433,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -454,7 +459,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -481,7 +486,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -503,5 +508,422 @@ describe('uploadDirectory', () => {
     const putCall = putCalls[0];
     if (!putCall) throw new Error('Expected PutObjectCommand call');
     expect(putCall.args[0].input.CacheControl).toBe('max-age=60');
+  });
+
+  it('sets content-md5 metadata on uploaded files', async () => {
+    const content = 'hello metadata';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Metadata?.['content-md5']).toBe(
+      md5Etag(content),
+    );
+  });
+
+  it('uses multipart upload for files above threshold', async () => {
+    const largeContent = Buffer.alloc(6 * 1024 * 1024, 'x'); // 6MB
+    fs.writeFileSync(path.join(tmpDir, 'large.bin'), largeContent);
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock
+      .on(CreateMultipartUploadCommand)
+      .resolves({ UploadId: 'test-upload-id' });
+    s3Mock.on(UploadPartCommand).resolves({ ETag: '"part-etag"' });
+    s3Mock.on(CompleteMultipartUploadCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      multipartThreshold: 5 * 1024 * 1024,
+      partSize: 5 * 1024 * 1024,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
+    expect(
+      s3Mock.commandCalls(CreateMultipartUploadCommand).length,
+    ).toBeGreaterThan(0);
+    expect(s3Mock.commandCalls(UploadPartCommand).length).toBeGreaterThan(0);
+    expect(
+      s3Mock.commandCalls(CompleteMultipartUploadCommand).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('uses PutObjectCommand for files below multipart threshold', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'small.txt'), 'hello');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      multipartThreshold: 5 * 1024 * 1024,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+    expect(s3Mock.commandCalls(CreateMultipartUploadCommand)).toHaveLength(0);
+  });
+
+  it('respects custom partSize for multipart uploads', async () => {
+    const largeContent = Buffer.alloc(11 * 1024 * 1024, 'x'); // 11MB
+    fs.writeFileSync(path.join(tmpDir, 'large.bin'), largeContent);
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(CreateMultipartUploadCommand).resolves({ UploadId: 'test-id' });
+    s3Mock.on(UploadPartCommand).resolves({ ETag: '"part-etag"' });
+    s3Mock.on(CompleteMultipartUploadCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      multipartThreshold: 5 * 1024 * 1024,
+      partSize: 5 * 1024 * 1024,
+      queueSize: 1,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    // 11MB file with 5MB parts = 3 parts (5 + 5 + 1)
+    expect(s3Mock.commandCalls(UploadPartCommand)).toHaveLength(3);
+  });
+
+  it('cleans up incomplete multipart upload on failure', async () => {
+    const largeContent = Buffer.alloc(6 * 1024 * 1024, 'x');
+    fs.writeFileSync(path.join(tmpDir, 'large.bin'), largeContent);
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(CreateMultipartUploadCommand).resolves({ UploadId: 'test-id' });
+    s3Mock.on(UploadPartCommand).rejects(new Error('Network error'));
+    s3Mock.on(AbortMultipartUploadCommand).resolves({});
+
+    const client = createTestS3Client();
+    await expect(
+      uploadDirectory({
+        s3Client: client,
+        localDir: tmpDir,
+        bucket: TEST_BUCKET,
+        prefix: '',
+        acl: 'private',
+        deleteRemoved: false,
+        multipartThreshold: 5 * 1024 * 1024,
+        partSize: 5 * 1024 * 1024,
+        progress: mockProgress(),
+        servicePath: tmpDir,
+      }),
+    ).rejects.toThrow();
+
+    expect(
+      s3Mock.commandCalls(AbortMultipartUploadCommand).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('skips unchanged multipart-uploaded file via content-md5 metadata', async () => {
+    const content = 'unchanged multipart content';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    // Simulate a multipart ETag (contains a dash)
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: 'file.txt', ETag: '"abc123-2"' }],
+    });
+    // HeadObject returns matching content-md5 metadata
+    s3Mock.on(HeadObjectCommand).resolves({
+      Metadata: { 'content-md5': md5Etag(content) },
+    });
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(HeadObjectCommand)).toHaveLength(1);
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
+    expect(s3Mock.commandCalls(CreateMultipartUploadCommand)).toHaveLength(0);
+  });
+
+  it('re-uploads when multipart metadata does not match', async () => {
+    const content = 'changed content';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: 'file.txt', ETag: '"abc123-2"' }],
+    });
+    s3Mock.on(HeadObjectCommand).resolves({
+      Metadata: { 'content-md5': '"old-md5-hash"' },
+    });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(HeadObjectCommand)).toHaveLength(1);
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+  });
+
+  it('re-uploads when HeadObject fails for multipart ETag', async () => {
+    const content = 'some content';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: 'file.txt', ETag: '"abc123-2"' }],
+    });
+    s3Mock.on(HeadObjectCommand).rejects(new Error('AccessDenied'));
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+  });
+
+  it('re-uploads when HeadObject returns no Metadata', async () => {
+    const content = 'some content';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: 'file.txt', ETag: '"abc123-2"' }],
+    });
+    s3Mock.on(HeadObjectCommand).resolves({
+      Metadata: undefined,
+    });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+  });
+
+  it('uploads empty file (0 bytes) correctly', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'empty.txt'), '');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Key).toBe('empty.txt');
+  });
+
+  it('multipartThreshold 0 forces streaming path for small file', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'tiny.txt'), 'hello');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      multipartThreshold: 0,
+      partSize: 5 * 1024 * 1024,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    // Upload class uses PutObjectCommand for files < partSize even with streaming body
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    // ContentLength is set when streaming path is used (threshold: 0 forces it)
+    expect(putCall.args[0].input.ContentLength).toBe(5);
+  });
+
+  it('s3Params cannot override critical fields like Bucket or Key', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = createTestS3Client();
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [
+        {
+          glob: '*.txt',
+          params: { Bucket: 'malicious-bucket', Key: 'malicious-key' },
+        },
+      ],
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
+    expect(putCall.args[0].input.Key).toBe('file.txt');
+  });
+
+  it('throws when file exceeds maximum S3 object size', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'huge.txt'), 'data');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+
+    // Capture the original before spying to avoid infinite recursion
+    const originalOpen = fs.promises.open;
+    const openSpy = vi.spyOn(fs.promises, 'open');
+    openSpy.mockImplementation(async (...args) => {
+      const fh = await originalOpen.call(
+        fs.promises,
+        ...(args as Parameters<typeof fs.promises.open>),
+      );
+      const originalStat = fh.stat.bind(fh);
+      (fh.stat as unknown) = async () => {
+        const realStat = await originalStat();
+        return { ...realStat, size: 50 * 1024 * 1024 * 1024 * 1024 }; // 50 TiB
+      };
+      return fh;
+    });
+
+    const client = createTestS3Client();
+    await expect(
+      uploadDirectory({
+        s3Client: client,
+        localDir: tmpDir,
+        bucket: TEST_BUCKET,
+        prefix: '',
+        acl: 'private',
+        deleteRemoved: false,
+        progress: mockProgress(),
+        servicePath: tmpDir,
+      }),
+    ).rejects.toThrow('exceeds the maximum S3 object size');
+
+    openSpy.mockRestore();
+  });
+
+  it('throws when file requires too many parts', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'big.txt'), 'data');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+
+    // Capture the original before spying to avoid infinite recursion
+    const originalOpen = fs.promises.open;
+    const openSpy = vi.spyOn(fs.promises, 'open');
+    openSpy.mockImplementation(async (...args) => {
+      const fh = await originalOpen.call(
+        fs.promises,
+        ...(args as Parameters<typeof fs.promises.open>),
+      );
+      const originalStat = fh.stat.bind(fh);
+      (fh.stat as unknown) = async () => {
+        const realStat = await originalStat();
+        return { ...realStat, size: 10_001 * 5 * 1024 * 1024 }; // exceeds 10,000 parts at 5MB
+      };
+      return fh;
+    });
+
+    const client = createTestS3Client();
+    await expect(
+      uploadDirectory({
+        s3Client: client,
+        localDir: tmpDir,
+        bucket: TEST_BUCKET,
+        prefix: '',
+        acl: 'private',
+        deleteRemoved: false,
+        partSize: 5 * 1024 * 1024,
+        progress: mockProgress(),
+        servicePath: tmpDir,
+      }),
+    ).rejects.toThrow('exceeding the S3 limit of 10000 parts');
+
+    openSpy.mockRestore();
   });
 });

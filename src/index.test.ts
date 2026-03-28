@@ -10,8 +10,10 @@ import {
 import {
   CopyObjectCommand,
   DeleteObjectsCommand,
+  GetBucketLifecycleConfigurationCommand,
   GetBucketTaggingCommand,
   ListObjectsV2Command,
+  PutBucketLifecycleConfigurationCommand,
   PutBucketTaggingCommand,
   PutObjectCommand,
   S3Client,
@@ -75,6 +77,9 @@ describe('ServerlessS3Ferry', () => {
   beforeEach(() => {
     s3Mock.reset();
     cfnMock.reset();
+    // Default lifecycle mocks for all sync tests
+    s3Mock.on(GetBucketLifecycleConfigurationCommand).resolves({ Rules: [] });
+    s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 's3ferry-test-'));
   });
 

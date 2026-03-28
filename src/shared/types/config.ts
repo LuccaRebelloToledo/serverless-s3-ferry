@@ -25,6 +25,10 @@ export interface BucketSyncConfig {
   preCommand?: string;
   params: ParamEntry[];
   bucketTags?: S3Params;
+  multipartThreshold?: number;
+  partSize?: number;
+  queueSize?: number;
+  abortIncompleteMultipartUploadDays?: number | false;
 }
 
 export interface RawBucketConfig extends Partial<BucketSyncConfig> {

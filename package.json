@@ -38,12 +38,14 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "npx @biomejs/biome check --write ./src",
+    "lint:ci": "npm run check-types && npx @biomejs/biome check ./src",
     "check-types": "tsc --noEmit",
     "prepare": "husky || true"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "^3.1018.0",
-    "@aws-sdk/client-s3": "^3.1018.0",
+    "@aws-sdk/client-cloudformation": "^3.1019.0",
+    "@aws-sdk/client-s3": "^3.1019.0",
+    "@aws-sdk/lib-storage": "^3.1019.0",
     "mime": "^4.1.0",
     "minimatch": "^10.2.4",
     "p-limit": "^3.1.0"
@@ -67,7 +69,8 @@
     "node": ">=22.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,json,md}": [
+    "*.ts": [
+      "bash -c 'npm run check-types'",
       "npm run lint"
     ]
   }

@@ -3,7 +3,7 @@ import {
   PutBucketTaggingCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mergeTags, updateBucketTags } from './tags';
@@ -54,7 +54,7 @@ describe('updateBucketTags', () => {
     });
     s3Mock.on(PutBucketTaggingCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await updateBucketTags({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -76,7 +76,7 @@ describe('updateBucketTags', () => {
     s3Mock.on(GetBucketTaggingCommand).rejects(noTagSetError);
     s3Mock.on(PutBucketTaggingCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await updateBucketTags({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -97,7 +97,7 @@ describe('updateBucketTags', () => {
     });
     s3Mock.on(PutBucketTaggingCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await updateBucketTags({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -114,7 +114,7 @@ describe('updateBucketTags', () => {
   it('re-throws other errors', async () => {
     s3Mock.on(GetBucketTaggingCommand).rejects(new Error('AccessDenied'));
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await expect(
       updateBucketTags({
         s3Client: client,
