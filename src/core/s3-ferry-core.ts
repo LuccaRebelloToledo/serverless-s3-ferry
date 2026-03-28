@@ -20,6 +20,7 @@ import {
   DEFAULT_MAX_CONCURRENCY,
   getBucketConfigs,
   getEndpoint,
+  getLocalFiles,
   IS_OFFLINE_ENV,
   type Plugin,
   PRE_COMMAND_TIMEOUT,
@@ -38,6 +39,11 @@ export interface S3FerryCoreOptions {
   bucket?: string;
   stage?: string;
   offline?: boolean;
+}
+
+interface ResolvedBucket {
+  config: BucketSyncConfig;
+  bucketName: string;
 }
 
 export class S3FerryCore {
@@ -68,37 +74,41 @@ export class S3FerryCore {
   }
 
   async performFullSync(): Promise<void> {
-    await this.sync();
-    await this.syncMetadata();
-    await this.syncBucketTags();
-  }
-
-  async sync(invokedAsCommand?: boolean): Promise<void> {
-    const rawBuckets = this.getRawBucketConfigs();
-    if (!rawBuckets) {
+    const resolvedBuckets = await this.resolveBuckets();
+    if (!resolvedBuckets) {
       this.log.error(
         'serverless-s3-ferry requires at least one configuration entry in custom.s3Ferry',
       );
       return;
     }
 
-    const taskProgress = this.progress.create({
-      message: this.bucket
+    const localFilesCache = new Map<string, string[]>();
+    await this.sync(undefined, resolvedBuckets, localFilesCache);
+    await this.syncMetadata(undefined, resolvedBuckets, localFilesCache);
+    await this.syncBucketTags(undefined, resolvedBuckets);
+  }
+
+  async sync(
+    invokedAsCommand?: boolean,
+    preResolved?: ResolvedBucket[],
+    localFilesCache?: Map<string, string[]>,
+  ): Promise<void> {
+    return this.forEachBucket({
+      taskMessage: this.bucket
         ? `Syncing directory attached to S3 bucket ${this.bucket}`
         : 'Syncing directories to S3 buckets',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
+      preResolved,
+      invokedAsCommand,
+      successMessage: 'Synced files to S3 buckets',
+      process: async ({ config, bucketName }) => {
         if (!config.enabled) return;
-
-        const bucketName = await this.getBucketName(config);
-        if (this.bucket && bucketName !== this.bucket) {
-          return;
-        }
+        if (this.bucket && bucketName !== this.bucket) return;
 
         const localDir = path.join(this.servicePath, config.localDir);
+        const localFiles = this.getCachedLocalFiles({
+          localDir,
+          cache: localFilesCache,
+        });
 
         const bucketProgress = this.progress.create({
           message: `${localDir}: sync with bucket ${bucketName} (0%)`,
@@ -147,43 +157,24 @@ export class S3FerryCore {
             servicePath: this.servicePath,
             stage: this.stage,
             log: this.log,
+            localFiles,
           });
         } finally {
           bucketProgress.remove();
         }
-      });
-
-      await Promise.all(promises);
-
-      if (invokedAsCommand) {
-        this.log.success('Synced files to S3 buckets');
-      } else {
-        this.log.verbose('Synced files to S3 buckets');
-      }
-    } finally {
-      taskProgress.remove();
-    }
+      },
+    });
   }
 
   async clear(): Promise<void> {
-    const rawBuckets = this.getRawBucketConfigs();
-    if (!rawBuckets) {
-      this.log.notice(
+    return this.forEachBucket({
+      taskMessage: 'Removing objects from S3 buckets',
+      nullLog: (msg) => this.log.notice(msg),
+      nullMessage:
         'No configuration found for serverless-s3-ferry, skipping removal...',
-      );
-      return;
-    }
-
-    const taskProgress = this.progress.create({
-      message: 'Removing objects from S3 buckets',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
+      successMessage: 'Removed objects from S3 buckets',
+      process: async ({ config, bucketName }) => {
         if (!config.enabled) return;
-
-        const bucketName = await this.getBucketName(config);
 
         const bucketProgress = this.progress.create({
           message: `${bucketName}: removing files with prefix ${config.bucketPrefix} (0%)`,
@@ -199,40 +190,29 @@ export class S3FerryCore {
         } finally {
           bucketProgress.remove();
         }
-      });
-
-      await Promise.all(promises);
-      this.log.verbose('Removed objects from S3 buckets');
-    } finally {
-      taskProgress.remove();
-    }
+      },
+    });
   }
 
-  async syncMetadata(invokedAsCommand?: boolean): Promise<void> {
-    const rawBuckets = this.getRawBucketConfigs();
-    if (!rawBuckets) {
-      this.log.error(
-        'serverless-s3-ferry requires at least one configuration entry in custom.s3Ferry',
-      );
-      return;
-    }
-
-    const taskProgress = this.progress.create({
-      message: 'Syncing bucket metadata',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
-
+  async syncMetadata(
+    invokedAsCommand?: boolean,
+    preResolved?: ResolvedBucket[],
+    localFilesCache?: Map<string, string[]>,
+  ): Promise<void> {
+    return this.forEachBucket({
+      taskMessage: 'Syncing bucket metadata',
+      preResolved,
+      invokedAsCommand,
+      successMessage: 'Synced bucket metadata',
+      process: async ({ config, bucketName }) => {
         if (config.params.length === 0) return;
-
-        const bucketName = await this.getBucketName(config);
-        if (this.bucket && bucketName !== this.bucket) {
-          return;
-        }
+        if (this.bucket && bucketName !== this.bucket) return;
 
         const localDir = path.join(this.servicePath, config.localDir);
+        const localFiles = this.getCachedLocalFiles({
+          localDir,
+          cache: localFilesCache,
+        });
 
         const bucketProgress = this.progress.create({
           message: `${localDir}: sync bucket metadata to ${bucketName} (0%)`,
@@ -250,44 +230,27 @@ export class S3FerryCore {
             stage: this.stage,
             progress: bucketProgress,
             log: this.log,
+            localFiles,
           });
         } finally {
           bucketProgress.remove();
         }
-      });
-
-      await Promise.all(promises);
-
-      if (invokedAsCommand) {
-        this.log.success('Synced bucket metadata');
-      } else {
-        this.log.verbose('Synced bucket metadata');
-      }
-    } finally {
-      taskProgress.remove();
-    }
+      },
+    });
   }
 
-  async syncBucketTags(invokedAsCommand?: boolean): Promise<void> {
-    const rawBuckets = this.getRawBucketConfigs();
-    if (!rawBuckets) {
-      this.log.error(
-        'serverless-s3-ferry requires at least one configuration entry in custom.s3Ferry',
-      );
-      return;
-    }
-
-    const taskProgress = this.progress.create({
-      message: 'Updating bucket tags',
-    });
-
-    try {
-      const promises = rawBuckets.map(async (raw) => {
-        const config = parseBucketConfig(raw);
-
-        if (!config.bucketTags) {
-          return;
-        }
+  async syncBucketTags(
+    invokedAsCommand?: boolean,
+    preResolved?: ResolvedBucket[],
+  ): Promise<void> {
+    return this.forEachBucket({
+      taskMessage: 'Updating bucket tags',
+      preResolved,
+      invokedAsCommand,
+      successMessage: 'Updated bucket tags',
+      process: async ({ config, bucketName }) => {
+        if (!config.bucketTags) return;
+        if (this.bucket && bucketName !== this.bucket) return;
 
         const tagsToUpdate: Tag[] = Object.keys(config.bucketTags)
           .map((tagKey) => ({
@@ -295,11 +258,6 @@ export class S3FerryCore {
             Value: config.bucketTags?.[tagKey],
           }))
           .filter((tag): tag is Tag => !!tag.Value);
-
-        const bucketName = await this.getBucketName(config);
-        if (this.bucket && bucketName !== this.bucket) {
-          return;
-        }
 
         const bucketProgress = this.progress.create({
           message: `${bucketName}: sync bucket tags`,
@@ -314,14 +272,44 @@ export class S3FerryCore {
         } finally {
           bucketProgress.remove();
         }
-      });
+      },
+    });
+  }
 
-      await Promise.all(promises);
+  private async forEachBucket(options: {
+    taskMessage: string;
+    nullMessage?: string;
+    nullLog?: (message: string) => void;
+    preResolved?: ResolvedBucket[];
+    process: (resolved: ResolvedBucket) => Promise<void>;
+    invokedAsCommand?: boolean;
+    successMessage: string;
+  }): Promise<void> {
+    const {
+      taskMessage,
+      nullMessage = 'serverless-s3-ferry requires at least one configuration entry in custom.s3Ferry',
+      nullLog = (msg: string) => this.log.error(msg),
+      preResolved,
+      process,
+      invokedAsCommand,
+      successMessage,
+    } = options;
+
+    const resolvedBuckets = preResolved ?? (await this.resolveBuckets());
+    if (!resolvedBuckets) {
+      nullLog(nullMessage);
+      return;
+    }
+
+    const taskProgress = this.progress.create({ message: taskMessage });
+
+    try {
+      await Promise.all(resolvedBuckets.map(process));
 
       if (invokedAsCommand) {
-        this.log.success('Updated bucket tags');
+        this.log.success(successMessage);
       } else {
-        this.log.verbose('Updated bucket tags');
+        this.log.verbose(successMessage);
       }
     } finally {
       taskProgress.remove();
@@ -344,9 +332,7 @@ export class S3FerryCore {
     return this._s3Client;
   }
 
-  private async getBucketName(
-    config: BucketSyncConfig | RawBucketConfig,
-  ): Promise<string> {
+  private async getBucketName(config: BucketSyncConfig): Promise<string> {
     if (config.bucketName) {
       return config.bucketName;
     }
@@ -363,7 +349,32 @@ export class S3FerryCore {
     );
   }
 
-  private getRawBucketConfigs(): RawBucketConfig[] | null {
-    return getBucketConfigs(this.rawConfig);
+  private async resolveBuckets(): Promise<ResolvedBucket[] | null> {
+    const rawBuckets = getBucketConfigs(this.rawConfig);
+    if (!rawBuckets) return null;
+
+    return Promise.all(
+      rawBuckets.map(async (raw) => {
+        const config = parseBucketConfig(raw);
+        const bucketName = await this.getBucketName(config);
+        return { config, bucketName };
+      }),
+    );
+  }
+
+  private getCachedLocalFiles(options: {
+    localDir: string;
+    cache?: Map<string, string[]>;
+  }): string[] {
+    const { localDir, cache } = options;
+    if (cache) {
+      let files = cache.get(localDir);
+      if (!files) {
+        files = getLocalFiles({ dir: localDir, log: this.log });
+        cache.set(localDir, files);
+      }
+      return files;
+    }
+    return getLocalFiles({ dir: localDir, log: this.log });
   }
 }

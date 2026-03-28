@@ -9,6 +9,7 @@ import {
   S3_FERRY_LIFECYCLE_RULE_ID,
   S3_NO_SUCH_LIFECYCLE_CONFIGURATION,
 } from '@shared';
+import { sendWithExpectedError } from './send-or-default';
 
 interface EnsureAbortIncompleteMultipartUploadRuleOptions {
   s3Client: S3Client;
@@ -22,23 +23,14 @@ export async function ensureAbortIncompleteMultipartUploadRule(
 ): Promise<void> {
   const { s3Client, bucket, prefix = '', daysAfterInitiation } = options;
 
-  let existingRules: LifecycleRule[] = [];
-
-  try {
-    const data = await s3Client.send(
-      new GetBucketLifecycleConfigurationCommand({ Bucket: bucket }),
-    );
-    existingRules = data.Rules ?? [];
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      err.name === S3_NO_SUCH_LIFECYCLE_CONFIGURATION
-    ) {
-      existingRules = [];
-    } else {
-      throw err;
-    }
-  }
+  const data = await sendWithExpectedError(
+    () =>
+      s3Client.send(
+        new GetBucketLifecycleConfigurationCommand({ Bucket: bucket }),
+      ),
+    S3_NO_SUCH_LIFECYCLE_CONFIGURATION,
+  );
+  const existingRules: LifecycleRule[] = data?.Rules ?? [];
 
   const existingRuleIndex = existingRules.findIndex(
     (rule) => rule.ID === S3_FERRY_LIFECYCLE_RULE_ID,

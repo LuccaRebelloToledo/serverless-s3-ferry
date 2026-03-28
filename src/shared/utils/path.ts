@@ -1,7 +1,9 @@
 import path from 'node:path';
 
+const PATH_SEP_RE = new RegExp(`\\${path.sep}`, 'g');
+
 export function toS3Path(osPath: string): string {
-  return osPath.replace(new RegExp(`\\${path.sep}`, 'g'), '/');
+  return osPath.replace(PATH_SEP_RE, '/');
 }
 
 /**

@@ -29,7 +29,7 @@ import {
   type UploadDirOptions,
 } from '@shared';
 import mime from 'mime';
-import { minimatch } from 'minimatch';
+import { Minimatch } from 'minimatch';
 import pLimit from 'p-limit';
 import { deleteObjectsByKeys } from './delete';
 import { listAllObjects } from './list';
@@ -40,6 +40,7 @@ interface UploadDirectoryOptions extends UploadDirOptions {
   servicePath: string;
   stage?: string;
   log?: ErrorLogger;
+  localFiles?: string[];
 }
 
 interface FileProcessEntry {
@@ -106,24 +107,39 @@ async function isFileUnchanged(
   return false;
 }
 
+interface CompiledParamMatcher {
+  matcher: Minimatch;
+  params: S3Params;
+}
+
+function compileParamMatchers(
+  params: ParamMatcher[],
+  localDir: string,
+): CompiledParamMatcher[] {
+  const resolvedDir = path.resolve(localDir);
+  return params.map((param) => ({
+    matcher: new Minimatch(`${resolvedDir}/${param.glob}`),
+    params: param.params,
+  }));
+}
+
 interface ResolveS3ParamsOptions {
   localFile: string;
-  localDir: string;
-  params?: ParamMatcher[];
+  compiledParams?: CompiledParamMatcher[];
   stage?: string;
 }
 
 function resolveS3Params(options: ResolveS3ParamsOptions): S3Params | null {
-  const { localFile, localDir, params, stage } = options;
-  if (!params || params.length === 0) {
+  const { localFile, compiledParams, stage } = options;
+  if (!compiledParams || compiledParams.length === 0) {
     return {};
   }
 
   const s3Params: S3Params = {};
   let onlyForStage: string | undefined;
 
-  for (const param of params) {
-    if (minimatch(localFile, `${path.resolve(localDir)}/${param.glob}`)) {
+  for (const param of compiledParams) {
+    if (param.matcher.match(localFile)) {
       Object.assign(s3Params, param.params);
       if (s3Params[ONLY_FOR_STAGE_KEY]) {
         onlyForStage = s3Params[ONLY_FOR_STAGE_KEY];
@@ -161,7 +177,8 @@ export async function uploadDirectory(
     log,
   } = options;
 
-  const localFiles = getLocalFiles({ dir: localDir, log });
+  const localFiles =
+    options.localFiles ?? getLocalFiles({ dir: localDir, log });
   const remoteObjects = await listAllObjects({ s3Client, bucket, prefix });
 
   // Build a map of remote objects by key for quick lookup
@@ -169,6 +186,11 @@ export async function uploadDirectory(
   for (const obj of remoteObjects) {
     remoteByKey.set(obj.Key, obj);
   }
+
+  // Pre-compile glob patterns once (avoids N*P recompilations)
+  const compiledParams = params
+    ? compileParamMatchers(params, localDir)
+    : undefined;
 
   // Build list of candidate files and track local keys (without reading file content)
   const filesToProcess: FileProcessEntry[] = [];
@@ -183,7 +205,7 @@ export async function uploadDirectory(
     localKeys.add(s3Key);
 
     // Resolve per-file S3 params (may return null to skip)
-    const s3Params = resolveS3Params({ localFile, localDir, params, stage });
+    const s3Params = resolveS3Params({ localFile, compiledParams, stage });
     if (s3Params === null) {
       continue;
     }
