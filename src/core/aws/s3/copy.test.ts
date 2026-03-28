@@ -1,5 +1,5 @@
 import { CopyObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { copyObjectWithMetadata } from './copy';
@@ -18,7 +18,7 @@ describe('copyObjectWithMetadata', () => {
   it('sends CopyObjectCommand with MetadataDirective REPLACE', async () => {
     s3Mock.on(CopyObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await copyObjectWithMetadata({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -40,7 +40,7 @@ describe('copyObjectWithMetadata', () => {
   it('includes contentType when provided', async () => {
     s3Mock.on(CopyObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await copyObjectWithMetadata({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -59,7 +59,7 @@ describe('copyObjectWithMetadata', () => {
   it('merges extraParams', async () => {
     s3Mock.on(CopyObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await copyObjectWithMetadata({
       s3Client: client,
       bucket: TEST_BUCKET,

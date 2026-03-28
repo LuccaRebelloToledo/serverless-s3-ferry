@@ -4,7 +4,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { S3_FERRY_LIFECYCLE_RULE_ID } from '@shared';
-import { TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ensureAbortIncompleteMultipartUploadRule } from './lifecycle';
@@ -26,7 +26,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     s3Mock.on(GetBucketLifecycleConfigurationCommand).rejects(noConfigError);
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -60,7 +60,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     });
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -91,7 +91,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     });
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -117,7 +117,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     });
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -139,7 +139,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
       .on(GetBucketLifecycleConfigurationCommand)
       .rejects(new Error('AccessDenied'));
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await expect(
       ensureAbortIncompleteMultipartUploadRule({
         s3Client: client,
@@ -155,7 +155,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     s3Mock.on(GetBucketLifecycleConfigurationCommand).rejects(noConfigError);
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -179,7 +179,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     s3Mock.on(GetBucketLifecycleConfigurationCommand).rejects(noConfigError);
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -202,7 +202,7 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
     s3Mock.on(GetBucketLifecycleConfigurationCommand).rejects(noConfigError);
     s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await ensureAbortIncompleteMultipartUploadRule({
       s3Client: client,
       bucket: TEST_BUCKET,

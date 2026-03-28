@@ -38,6 +38,7 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "npx @biomejs/biome check --write ./src",
+    "lint:ci": "npm run check-types && npx @biomejs/biome check ./src",
     "check-types": "tsc --noEmit",
     "prepare": "husky || true"
   },
@@ -68,7 +69,8 @@
     "node": ">=22.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,json,md}": [
+    "*.ts": [
+      "bash -c 'npm run check-types'",
       "npm run lint"
     ]
   }

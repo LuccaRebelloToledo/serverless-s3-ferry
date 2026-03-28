@@ -1,3 +1,4 @@
+import { S3Client } from '@aws-sdk/client-s3';
 import type { AwsProviderExtended, Plugin } from '@shared';
 import { vi } from 'vitest';
 import {
@@ -6,6 +7,10 @@ import {
   TEST_SECRET_KEY,
   TEST_STACK_NAME,
 } from './constants';
+
+export function createTestS3Client(): S3Client {
+  return new S3Client({ region: TEST_REGION });
+}
 
 type MockProvider = Pick<AwsProviderExtended, 'cachedCredentials'> & {
   getRegion: () => string;

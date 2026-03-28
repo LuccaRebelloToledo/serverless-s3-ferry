@@ -31,6 +31,9 @@ jobs:
       - name: Run dependency vulnerability scan (SCA)
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Lint and type check
+        run: npm run lint:ci
+
       - name: Build project
         run: npm run build
 

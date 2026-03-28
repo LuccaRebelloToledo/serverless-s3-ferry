@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CopyObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { mockProgress, TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { syncDirectoryMetadata } from './metadata';
@@ -28,7 +28,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -58,7 +58,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -80,7 +80,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -105,7 +105,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -134,7 +134,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -161,7 +161,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -188,7 +188,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -208,7 +208,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -238,7 +238,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -266,7 +266,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -288,7 +288,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -311,7 +311,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -337,7 +337,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -358,7 +358,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -380,7 +380,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -402,7 +402,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -426,7 +426,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -451,7 +451,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -477,7 +477,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -514,7 +514,7 @@ describe('syncDirectoryMetadata', () => {
         return {};
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -538,7 +538,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -561,7 +561,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -585,7 +585,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -610,7 +610,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const mockProgressLogger = mockProgress();
       await syncDirectoryMetadata({
         s3Client: client,
@@ -630,7 +630,7 @@ describe('syncDirectoryMetadata', () => {
     it('reports 0% for empty directory', async () => {
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const mockProgressLogger = mockProgress();
       await syncDirectoryMetadata({
         s3Client: client,
@@ -652,7 +652,7 @@ describe('syncDirectoryMetadata', () => {
     it('handles empty directory', async () => {
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -672,7 +672,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -696,7 +696,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,
@@ -722,7 +722,7 @@ describe('syncDirectoryMetadata', () => {
 
       s3Mock.on(CopyObjectCommand).resolves({});
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await syncDirectoryMetadata({
         s3Client: client,
         localDir: tmpDir,

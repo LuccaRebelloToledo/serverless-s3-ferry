@@ -3,7 +3,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { mockProgress, TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { deleteDirectory } from './delete';
@@ -26,7 +26,7 @@ describe('deleteDirectory', () => {
     });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await deleteDirectory({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -58,7 +58,7 @@ describe('deleteDirectory', () => {
       });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await deleteDirectory({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -85,7 +85,7 @@ describe('deleteDirectory', () => {
     });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await deleteDirectory({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -108,7 +108,7 @@ describe('deleteDirectory', () => {
       IsTruncated: false,
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await deleteDirectory({
       s3Client: client,
       bucket: TEST_BUCKET,
@@ -125,7 +125,7 @@ describe('deleteDirectory', () => {
       IsTruncated: false,
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await deleteDirectory({
       s3Client: client,
       bucket: TEST_BUCKET,

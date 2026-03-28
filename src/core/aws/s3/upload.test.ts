@@ -13,9 +13,9 @@ import {
   S3Client,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
-import { mockProgress, TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uploadDirectory } from './upload';
 
 function md5Etag(content: string): string {
@@ -42,7 +42,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -72,7 +72,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -97,7 +97,7 @@ describe('uploadDirectory', () => {
       Contents: [{ Key: 'file.txt', ETag: md5Etag(content) }],
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -119,7 +119,7 @@ describe('uploadDirectory', () => {
     });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -145,7 +145,7 @@ describe('uploadDirectory', () => {
       Contents: [{ Key: 'old.txt', ETag: '"abc"' }],
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -166,7 +166,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -201,7 +201,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(PutObjectCommand).resolves({});
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -237,7 +237,7 @@ describe('uploadDirectory', () => {
     });
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -265,7 +265,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -303,7 +303,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -326,7 +326,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -349,7 +349,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -374,7 +374,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -405,7 +405,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(PutObjectCommand).resolves({});
     s3Mock.on(DeleteObjectsCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -433,7 +433,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -459,7 +459,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -486,7 +486,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -517,7 +517,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -549,7 +549,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(UploadPartCommand).resolves({ ETag: '"part-etag"' });
     s3Mock.on(CompleteMultipartUploadCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -579,7 +579,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -605,7 +605,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(UploadPartCommand).resolves({ ETag: '"part-etag"' });
     s3Mock.on(CompleteMultipartUploadCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -633,7 +633,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(UploadPartCommand).rejects(new Error('Network error'));
     s3Mock.on(AbortMultipartUploadCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await expect(
       uploadDirectory({
         s3Client: client,
@@ -667,7 +667,7 @@ describe('uploadDirectory', () => {
       Metadata: { 'content-md5': md5Etag(content) },
     });
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -696,7 +696,7 @@ describe('uploadDirectory', () => {
     });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -722,7 +722,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(HeadObjectCommand).rejects(new Error('AccessDenied'));
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -749,7 +749,7 @@ describe('uploadDirectory', () => {
     });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -770,7 +770,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -795,7 +795,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -824,7 +824,7 @@ describe('uploadDirectory', () => {
     s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
     s3Mock.on(PutObjectCommand).resolves({});
 
-    const client = new S3Client({});
+    const client = createTestS3Client();
     await uploadDirectory({
       s3Client: client,
       localDir: tmpDir,
@@ -848,5 +848,82 @@ describe('uploadDirectory', () => {
     if (!putCall) throw new Error('Expected PutObjectCommand call');
     expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
     expect(putCall.args[0].input.Key).toBe('file.txt');
+  });
+
+  it('throws when file exceeds maximum S3 object size', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'huge.txt'), 'data');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+
+    // Capture the original before spying to avoid infinite recursion
+    const originalOpen = fs.promises.open;
+    const openSpy = vi.spyOn(fs.promises, 'open');
+    openSpy.mockImplementation(async (...args) => {
+      const fh = await originalOpen.call(
+        fs.promises,
+        ...(args as Parameters<typeof fs.promises.open>),
+      );
+      const originalStat = fh.stat.bind(fh);
+      (fh.stat as unknown) = async () => {
+        const realStat = await originalStat();
+        return { ...realStat, size: 50 * 1024 * 1024 * 1024 * 1024 }; // 50 TiB
+      };
+      return fh;
+    });
+
+    const client = createTestS3Client();
+    await expect(
+      uploadDirectory({
+        s3Client: client,
+        localDir: tmpDir,
+        bucket: TEST_BUCKET,
+        prefix: '',
+        acl: 'private',
+        deleteRemoved: false,
+        progress: mockProgress(),
+        servicePath: tmpDir,
+      }),
+    ).rejects.toThrow('exceeds the maximum S3 object size');
+
+    openSpy.mockRestore();
+  });
+
+  it('throws when file requires too many parts', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'big.txt'), 'data');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+
+    // Capture the original before spying to avoid infinite recursion
+    const originalOpen = fs.promises.open;
+    const openSpy = vi.spyOn(fs.promises, 'open');
+    openSpy.mockImplementation(async (...args) => {
+      const fh = await originalOpen.call(
+        fs.promises,
+        ...(args as Parameters<typeof fs.promises.open>),
+      );
+      const originalStat = fh.stat.bind(fh);
+      (fh.stat as unknown) = async () => {
+        const realStat = await originalStat();
+        return { ...realStat, size: 10_001 * 5 * 1024 * 1024 }; // exceeds 10,000 parts at 5MB
+      };
+      return fh;
+    });
+
+    const client = createTestS3Client();
+    await expect(
+      uploadDirectory({
+        s3Client: client,
+        localDir: tmpDir,
+        bucket: TEST_BUCKET,
+        prefix: '',
+        acl: 'private',
+        deleteRemoved: false,
+        partSize: 5 * 1024 * 1024,
+        progress: mockProgress(),
+        servicePath: tmpDir,
+      }),
+    ).rejects.toThrow('exceeding the S3 limit of 10000 parts');
+
+    openSpy.mockRestore();
   });
 });

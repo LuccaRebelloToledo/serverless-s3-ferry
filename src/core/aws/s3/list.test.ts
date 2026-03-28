@@ -1,5 +1,5 @@
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
-import { TEST_BUCKET } from '@shared/testing';
+import { createTestS3Client, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listAllObjects } from './list';
@@ -25,7 +25,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -54,7 +54,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -87,7 +87,7 @@ describe('listAllObjects', () => {
           IsTruncated: false,
         });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -120,7 +120,7 @@ describe('listAllObjects', () => {
           IsTruncated: false,
         });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -148,7 +148,7 @@ describe('listAllObjects', () => {
           IsTruncated: false,
         });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -184,7 +184,7 @@ describe('listAllObjects', () => {
           IsTruncated: false,
         });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -207,7 +207,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -222,7 +222,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -241,7 +241,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -263,7 +263,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
@@ -288,7 +288,7 @@ describe('listAllObjects', () => {
         IsTruncated: false,
       });
 
-      const client = new S3Client({});
+      const client = createTestS3Client();
       const result = await listAllObjects({
         s3Client: client,
         bucket: TEST_BUCKET,
