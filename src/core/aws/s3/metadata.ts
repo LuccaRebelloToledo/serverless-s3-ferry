@@ -29,6 +29,7 @@ interface SyncMetadataOptions {
   stage?: string;
   progress: Plugin.Progress;
   log?: ErrorLogger;
+  localFiles?: string[];
 }
 
 export async function syncDirectoryMetadata(
@@ -52,30 +53,34 @@ export async function syncDirectoryMetadata(
     normalizedPrefix = bucketPrefix.replace(/\/?$/, '').replace(/^\/?/, '/');
   }
 
+  const resolvedLocalDir = path.resolve(localDir);
+  const resolvedLocalDirPrefix = resolvedLocalDir + path.sep;
+
   const fileMap = new Map<string, FileToSync>();
   const ignored = new Set<string>(IGNORED_FILES);
-  const files = getLocalFiles({ dir: localDir, log });
+  const files = options.localFiles ?? getLocalFiles({ dir: localDir, log });
 
   for (const param of params) {
     const glob = Object.keys(param)[0];
+    const matchParams = extractMetaParams(param);
     const matches = minimatch.match(
       files,
-      `${path.resolve(localDir)}${path.sep}${glob}`,
+      `${resolvedLocalDir}${path.sep}${glob}`,
       { matchBase: true },
     );
 
+    const skipStage =
+      !!matchParams[ONLY_FOR_STAGE_KEY] &&
+      matchParams[ONLY_FOR_STAGE_KEY] !== stage;
+    delete matchParams[ONLY_FOR_STAGE_KEY];
+
     for (const match of matches) {
       if (ignored.has(match)) continue;
-      const matchParams = extractMetaParams(param);
-      if (
-        matchParams[ONLY_FOR_STAGE_KEY] &&
-        matchParams[ONLY_FOR_STAGE_KEY] !== stage
-      ) {
+      if (skipStage) {
         ignored.add(match);
         fileMap.delete(match);
         continue;
       }
-      delete matchParams[ONLY_FOR_STAGE_KEY];
       fileMap.set(match, { name: match, params: matchParams });
     }
   }
@@ -95,15 +100,13 @@ export async function syncDirectoryMetadata(
         }
 
         const copySource = encodeSpecialCharacters(
-          toS3Path(
-            file.name.replace(path.resolve(localDir) + path.sep, bucketDir),
-          ),
+          toS3Path(file.name.replace(resolvedLocalDirPrefix, bucketDir)),
         );
 
         const key = encodeSpecialCharacters(
           toS3Path(
             file.name.replace(
-              path.resolve(localDir) + path.sep,
+              resolvedLocalDirPrefix,
               normalizedPrefix ? `${normalizedPrefix.replace(/^\//, '')}/` : '',
             ),
           ),
