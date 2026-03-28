@@ -16,11 +16,14 @@ import {
   DEFAULT_QUEUE_SIZE,
   type ErrorLogger,
   getLocalFiles,
+  MAX_OBJECT_SIZE,
+  MAX_PARTS_PER_UPLOAD,
   ONLY_FOR_STAGE_KEY,
   type ParamMatcher,
   type Plugin,
   S3_CONTENT_MD5_METADATA_KEY,
   type S3Object,
+  S3OperationError,
   type S3Params,
   toS3Path,
   type UploadDirOptions,
@@ -45,7 +48,13 @@ interface FileProcessEntry {
   s3Params: S3Params;
 }
 
-function computeFileMD5(fh: fs.promises.FileHandle): Promise<string> {
+function computeBufferMD5(buffer: Buffer): string {
+  return `"${crypto.createHash('md5').update(buffer).digest('hex')}"`;
+}
+
+// Streams the file for MD5 without loading it into memory.
+// Uses autoClose: false to keep the shared file handle open for subsequent reads.
+function computeStreamMD5(fh: fs.promises.FileHandle): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('md5');
     const stream = fh.createReadStream({ start: 0, autoClose: false });
@@ -212,7 +221,40 @@ export async function uploadDirectory(
         const fh = await fs.promises.open(entry.localPath, 'r');
         try {
           const stat = await fh.stat();
-          const localMD5 = await computeFileMD5(fh);
+
+          if (stat.size > MAX_OBJECT_SIZE) {
+            throw new S3OperationError(
+              `File ${entry.localPath} (${stat.size} bytes) exceeds the maximum S3 object size of ${MAX_OBJECT_SIZE} bytes (~48.8 TiB)`,
+              bucket,
+            );
+          }
+
+          const requiredParts = Math.ceil(stat.size / partSize);
+          if (requiredParts > MAX_PARTS_PER_UPLOAD) {
+            throw new S3OperationError(
+              `File ${entry.localPath} (${stat.size} bytes) would require ${requiredParts} parts with partSize ${partSize}, exceeding the S3 limit of ${MAX_PARTS_PER_UPLOAD} parts. Increase partSize to at least ${Math.ceil(stat.size / MAX_PARTS_PER_UPLOAD)} bytes`,
+              bucket,
+            );
+          }
+
+          const isLargeFile = stat.size > multipartThreshold;
+
+          // MD5 is always needed: either for change detection (ETag comparison)
+          // or for the x-amz-meta-content-md5 metadata on upload
+          // Small files: read buffer once, compute MD5 from it, reuse buffer for upload
+          // Large files: stream MD5 computation, then stream upload body separately
+          let localMD5: string;
+          let body: Buffer | fs.ReadStream;
+
+          if (isLargeFile) {
+            localMD5 = await computeStreamMD5(fh);
+            // autoClose: false keeps the shared fd open — closed in the finally block
+            body = fh.createReadStream({ start: 0, autoClose: false });
+          } else {
+            const buffer = await fh.readFile();
+            localMD5 = computeBufferMD5(buffer);
+            body = buffer;
+          }
 
           // Check if file has changed (supports both single-part and multipart ETags)
           const remote = remoteByKey.get(entry.s3Key);
@@ -233,12 +275,6 @@ export async function uploadDirectory(
             mime.getType(entry.localPath) ??
             defaultContentType ??
             DEFAULT_CONTENT_TYPE;
-
-          // Stream large files to avoid holding full buffer in memory during upload
-          const isLargeFile = stat.size > multipartThreshold;
-          const body: Buffer | fs.ReadStream = isLargeFile
-            ? fh.createReadStream({ start: 0, autoClose: false })
-            : await fh.readFile();
 
           const putParams: PutObjectCommandInput = {
             ...entry.s3Params,

@@ -172,4 +172,49 @@ describe('ensureAbortIncompleteMultipartUploadRule', () => {
       3,
     );
   });
+
+  it('scopes lifecycle rule to the provided prefix', async () => {
+    const noConfigError = new Error('NoSuchLifecycleConfiguration');
+    noConfigError.name = 'NoSuchLifecycleConfiguration';
+    s3Mock.on(GetBucketLifecycleConfigurationCommand).rejects(noConfigError);
+    s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
+
+    const client = new S3Client({});
+    await ensureAbortIncompleteMultipartUploadRule({
+      s3Client: client,
+      bucket: TEST_BUCKET,
+      prefix: 'assets/',
+      daysAfterInitiation: 7,
+    });
+
+    const putCall = s3Mock.commandCalls(
+      PutBucketLifecycleConfigurationCommand,
+    )[0];
+    if (!putCall)
+      throw new Error('Expected PutBucketLifecycleConfigurationCommand call');
+    const rules = putCall.args[0].input.LifecycleConfiguration?.Rules ?? [];
+    expect(rules[0]?.Filter?.Prefix).toBe('assets/');
+  });
+
+  it('defaults prefix to empty string when not provided', async () => {
+    const noConfigError = new Error('NoSuchLifecycleConfiguration');
+    noConfigError.name = 'NoSuchLifecycleConfiguration';
+    s3Mock.on(GetBucketLifecycleConfigurationCommand).rejects(noConfigError);
+    s3Mock.on(PutBucketLifecycleConfigurationCommand).resolves({});
+
+    const client = new S3Client({});
+    await ensureAbortIncompleteMultipartUploadRule({
+      s3Client: client,
+      bucket: TEST_BUCKET,
+      daysAfterInitiation: 7,
+    });
+
+    const putCall = s3Mock.commandCalls(
+      PutBucketLifecycleConfigurationCommand,
+    )[0];
+    if (!putCall)
+      throw new Error('Expected PutBucketLifecycleConfigurationCommand call');
+    const rules = putCall.args[0].input.LifecycleConfiguration?.Rules ?? [];
+    expect(rules[0]?.Filter?.Prefix).toBe('');
+  });
 });

@@ -113,6 +113,21 @@ export class S3FerryCore {
             });
           }
 
+          // Apply lifecycle rule before upload so incomplete multipart uploads
+          // are cleaned up even if the upload fails partway through
+          const abortDays =
+            config.abortIncompleteMultipartUploadDays ??
+            DEFAULT_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS;
+
+          if (abortDays !== false) {
+            await ensureAbortIncompleteMultipartUploadRule({
+              s3Client: this.getS3Client(),
+              bucket: bucketName,
+              prefix: config.bucketPrefix,
+              daysAfterInitiation: abortDays,
+            });
+          }
+
           const paramMatchers = buildParamMatchers(config.params);
 
           await uploadDirectory({
@@ -133,18 +148,6 @@ export class S3FerryCore {
             stage: this.stage,
             log: this.log,
           });
-
-          const abortDays =
-            config.abortIncompleteMultipartUploadDays ??
-            DEFAULT_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS;
-
-          if (abortDays !== false) {
-            await ensureAbortIncompleteMultipartUploadRule({
-              s3Client: this.getS3Client(),
-              bucket: bucketName,
-              daysAfterInitiation: abortDays,
-            });
-          }
         } finally {
           bucketProgress.remove();
         }

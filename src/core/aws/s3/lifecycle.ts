@@ -13,13 +13,14 @@ import {
 interface EnsureAbortIncompleteMultipartUploadRuleOptions {
   s3Client: S3Client;
   bucket: string;
+  prefix?: string;
   daysAfterInitiation: number;
 }
 
 export async function ensureAbortIncompleteMultipartUploadRule(
   options: EnsureAbortIncompleteMultipartUploadRuleOptions,
 ): Promise<void> {
-  const { s3Client, bucket, daysAfterInitiation } = options;
+  const { s3Client, bucket, prefix = '', daysAfterInitiation } = options;
 
   let existingRules: LifecycleRule[] = [];
 
@@ -46,7 +47,7 @@ export async function ensureAbortIncompleteMultipartUploadRule(
   const abortRule: LifecycleRule = {
     ID: S3_FERRY_LIFECYCLE_RULE_ID,
     Status: 'Enabled',
-    Filter: { Prefix: '' },
+    Filter: { Prefix: prefix },
     AbortIncompleteMultipartUpload: {
       DaysAfterInitiation: daysAfterInitiation,
     },
