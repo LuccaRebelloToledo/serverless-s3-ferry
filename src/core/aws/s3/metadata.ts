@@ -53,6 +53,9 @@ export async function syncDirectoryMetadata(
     normalizedPrefix = bucketPrefix.replace(/\/?$/, '').replace(/^\/?/, '/');
   }
 
+  const resolvedLocalDir = path.resolve(localDir);
+  const resolvedLocalDirPrefix = resolvedLocalDir + path.sep;
+
   const fileMap = new Map<string, FileToSync>();
   const ignored = new Set<string>(IGNORED_FILES);
   const files = options.localFiles ?? getLocalFiles({ dir: localDir, log });
@@ -62,7 +65,7 @@ export async function syncDirectoryMetadata(
     const matchParams = extractMetaParams(param);
     const matches = minimatch.match(
       files,
-      `${path.resolve(localDir)}${path.sep}${glob}`,
+      `${resolvedLocalDir}${path.sep}${glob}`,
       { matchBase: true },
     );
 
@@ -97,15 +100,13 @@ export async function syncDirectoryMetadata(
         }
 
         const copySource = encodeSpecialCharacters(
-          toS3Path(
-            file.name.replace(path.resolve(localDir) + path.sep, bucketDir),
-          ),
+          toS3Path(file.name.replace(resolvedLocalDirPrefix, bucketDir)),
         );
 
         const key = encodeSpecialCharacters(
           toS3Path(
             file.name.replace(
-              path.resolve(localDir) + path.sep,
+              resolvedLocalDirPrefix,
               normalizedPrefix ? `${normalizedPrefix.replace(/^\//, '')}/` : '',
             ),
           ),

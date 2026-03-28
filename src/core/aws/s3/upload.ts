@@ -37,7 +37,6 @@ import { listAllObjects } from './list';
 interface UploadDirectoryOptions extends UploadDirOptions {
   s3Client: S3Client;
   progress: Plugin.Progress;
-  servicePath: string;
   stage?: string;
   log?: ErrorLogger;
   localFiles?: string[];

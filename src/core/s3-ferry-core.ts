@@ -154,7 +154,6 @@ export class S3FerryCore {
             partSize: config.partSize,
             queueSize: config.queueSize,
             progress: bucketProgress,
-            servicePath: this.servicePath,
             stage: this.stage,
             log: this.log,
             localFiles,
