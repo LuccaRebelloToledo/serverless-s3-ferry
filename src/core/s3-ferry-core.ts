@@ -102,7 +102,6 @@ export class S3FerryCore {
       successMessage: 'Synced files to S3 buckets',
       process: async ({ config, bucketName }) => {
         if (!config.enabled) return;
-        if (this.bucket && bucketName !== this.bucket) return;
 
         const localDir = path.join(this.servicePath, config.localDir);
         const localFiles = this.getCachedLocalFiles({
@@ -205,7 +204,6 @@ export class S3FerryCore {
       successMessage: 'Synced bucket metadata',
       process: async ({ config, bucketName }) => {
         if (config.params.length === 0) return;
-        if (this.bucket && bucketName !== this.bucket) return;
 
         const localDir = path.join(this.servicePath, config.localDir);
         const localFiles = this.getCachedLocalFiles({
@@ -249,7 +247,6 @@ export class S3FerryCore {
       successMessage: 'Updated bucket tags',
       process: async ({ config, bucketName }) => {
         if (!config.bucketTags) return;
-        if (this.bucket && bucketName !== this.bucket) return;
 
         const tagsToUpdate: Tag[] = Object.keys(config.bucketTags)
           .map((tagKey) => ({
@@ -300,10 +297,14 @@ export class S3FerryCore {
       return;
     }
 
+    const filteredBuckets = this.bucket
+      ? resolvedBuckets.filter((rb) => rb.bucketName === this.bucket)
+      : resolvedBuckets;
+
     const taskProgress = this.progress.create({ message: taskMessage });
 
     try {
-      await Promise.all(resolvedBuckets.map(process));
+      await Promise.all(filteredBuckets.map(process));
 
       if (invokedAsCommand) {
         this.log.success(successMessage);

@@ -10,16 +10,18 @@ interface MergeTagsOptions {
   tagsToMerge: Tag[];
 }
 
-export function mergeTags(options: MergeTagsOptions): void {
+export function mergeTags(options: MergeTagsOptions): Tag[] {
   const { existingTagSet, tagsToMerge } = options;
+  const merged = existingTagSet.map((tag) => ({ ...tag }));
   for (const tag of tagsToMerge) {
-    const existing = existingTagSet.find((et) => et.Key === tag.Key);
+    const existing = merged.find((et) => et.Key === tag.Key);
     if (existing) {
       existing.Value = tag.Value;
     } else {
-      existingTagSet.push(tag);
+      merged.push({ ...tag });
     }
   }
+  return merged;
 }
 
 interface UpdateBucketTagsOptions {
@@ -39,12 +41,15 @@ export async function updateBucketTags(
   );
   const existingTagSet: Tag[] = (data?.TagSet as Tag[]) ?? [];
 
-  mergeTags({ existingTagSet, tagsToMerge: tagsToUpdate });
+  const mergedTagSet = mergeTags({
+    existingTagSet,
+    tagsToMerge: tagsToUpdate,
+  });
 
   await s3Client.send(
     new PutBucketTaggingCommand({
       Bucket: bucket,
-      Tagging: { TagSet: existingTagSet },
+      Tagging: { TagSet: mergedTagSet },
     }),
   );
 }

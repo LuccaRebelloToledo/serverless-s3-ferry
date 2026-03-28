@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { ObjectCannedACL, S3Client } from '@aws-sdk/client-s3';
 import {
+  createProgressTracker,
   DEFAULT_MAX_CONCURRENCY,
   type ErrorLogger,
   encodeSpecialCharacters,
@@ -14,7 +15,7 @@ import {
   toS3Path,
 } from '@shared';
 import mime from 'mime';
-import { minimatch } from 'minimatch';
+import { Minimatch } from 'minimatch';
 import pLimit from 'p-limit';
 import { copyObjectWithMetadata } from './copy';
 
@@ -62,32 +63,42 @@ export async function syncDirectoryMetadata(
 
   for (const param of params) {
     const glob = Object.keys(param)[0];
+    if (!glob) continue;
+
     const matchParams = extractMetaParams(param);
-    const matches = minimatch.match(
-      files,
-      `${resolvedLocalDir}${path.sep}${glob}`,
-      { matchBase: true },
-    );
+    const matcher = new Minimatch(`${resolvedLocalDir}${path.sep}${glob}`, {
+      matchBase: true,
+    });
 
     const skipStage =
       !!matchParams[ONLY_FOR_STAGE_KEY] &&
       matchParams[ONLY_FOR_STAGE_KEY] !== stage;
     delete matchParams[ONLY_FOR_STAGE_KEY];
 
-    for (const match of matches) {
-      if (ignored.has(match)) continue;
+    for (const file of files) {
+      if (!matcher.match(file)) continue;
+      if (ignored.has(file)) continue;
       if (skipStage) {
-        ignored.add(match);
-        fileMap.delete(match);
+        ignored.add(file);
+        fileMap.delete(file);
         continue;
       }
-      fileMap.set(match, { name: match, params: matchParams });
+      fileMap.set(file, { name: file, params: matchParams });
     }
   }
 
   const filesToSync = Array.from(fileMap.values());
 
   const bucketDir = `${bucket}${normalizedPrefix === '' ? '' : normalizedPrefix}/`;
+
+  const tracker = createProgressTracker({
+    progressEntry: progress,
+    buildMessage: (percent) =>
+      `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
+  });
+
+  let completedOperations = 0;
+  const totalOperations = filesToSync.length;
 
   const limit = pLimit(DEFAULT_MAX_CONCURRENCY);
   await Promise.all(
@@ -121,12 +132,10 @@ export async function syncDirectoryMetadata(
           contentType,
           extraParams: file.params,
         });
+
+        completedOperations++;
+        tracker.update(completedOperations, totalOperations);
       }),
     ),
-  );
-
-  const percent = filesToSync.length > 0 ? 100 : 0;
-  progress.update(
-    `${localDir}: sync bucket metadata to ${bucketDir} (${percent}%)`,
   );
 }

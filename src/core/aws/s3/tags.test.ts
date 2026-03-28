@@ -11,11 +11,11 @@ import { mergeTags, updateBucketTags } from './tags';
 describe('mergeTags', () => {
   it('adds new tags', () => {
     const existing = [{ Key: 'a', Value: '1' }];
-    mergeTags({
+    const result = mergeTags({
       existingTagSet: existing,
       tagsToMerge: [{ Key: 'b', Value: '2' }],
     });
-    expect(existing).toEqual([
+    expect(result).toEqual([
       { Key: 'a', Value: '1' },
       { Key: 'b', Value: '2' },
     ]);
@@ -23,17 +23,25 @@ describe('mergeTags', () => {
 
   it('updates existing tags', () => {
     const existing = [{ Key: 'a', Value: '1' }];
-    mergeTags({
+    const result = mergeTags({
       existingTagSet: existing,
       tagsToMerge: [{ Key: 'a', Value: '99' }],
     });
-    expect(existing).toEqual([{ Key: 'a', Value: '99' }]);
+    expect(result).toEqual([{ Key: 'a', Value: '99' }]);
+  });
+
+  it('does not mutate the input arrays', () => {
+    const existing = [{ Key: 'a', Value: '1' }];
+    const toMerge = [{ Key: 'b', Value: '2' }];
+    mergeTags({ existingTagSet: existing, tagsToMerge: toMerge });
+    expect(existing).toEqual([{ Key: 'a', Value: '1' }]);
+    expect(toMerge).toEqual([{ Key: 'b', Value: '2' }]);
   });
 
   it('handles empty tagsToMerge', () => {
     const existing = [{ Key: 'a', Value: '1' }];
-    mergeTags({ existingTagSet: existing, tagsToMerge: [] });
-    expect(existing).toEqual([{ Key: 'a', Value: '1' }]);
+    const result = mergeTags({ existingTagSet: existing, tagsToMerge: [] });
+    expect(result).toEqual([{ Key: 'a', Value: '1' }]);
   });
 });
 
