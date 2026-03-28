@@ -28,7 +28,7 @@ export interface BucketSyncConfig {
   multipartThreshold?: number;
   partSize?: number;
   queueSize?: number;
-  abortIncompleteMultipartUploadDays?: number;
+  abortIncompleteMultipartUploadDays?: number | false;
 }
 
 export interface RawBucketConfig extends Partial<BucketSyncConfig> {

@@ -146,7 +146,7 @@ resources:
 | `multipartThreshold` | number | `104857600` | File size in bytes above which streaming multipart upload is used (100 MB). Set to `0` to always use multipart. Must be >= 0 |
 | `partSize` | number | `16777216` | Size of each part in bytes for multipart upload (16 MB). Min: 5 MiB, Max: 5 GiB |
 | `queueSize` | number | `4` | Number of concurrent part uploads per file. Min: 1 |
-| `abortIncompleteMultipartUploadDays` | number | `7` | Days after which incomplete multipart uploads are automatically aborted via S3 lifecycle rule. Min: 1 |
+| `abortIncompleteMultipartUploadDays` | number \| false | `7` | Days after which incomplete multipart uploads are automatically aborted via S3 lifecycle rule. Min: 1. Set to `false` to disable |
 
 ### Global options
 
@@ -292,7 +292,7 @@ custom:
 
 The defaults (100 MB threshold, 16 MB part size) follow [AWS best practices](https://repost.aws/knowledge-center/s3-upload-large-files). Increase `partSize` to 64 MB for very large files (> 1 GB) to reduce the number of parts, or increase `queueSize` on high-bandwidth connections.
 
-Setting `multipartThreshold: 0` forces all files to use streaming multipart upload regardless of size.
+Setting `multipartThreshold: 0` forces all files to use the streaming upload path regardless of size. The `Upload` class still decides internally whether to use multipart or a single `PutObject` based on the actual file size vs `partSize`.
 
 #### S3 multipart upload limits
 

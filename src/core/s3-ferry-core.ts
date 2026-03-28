@@ -138,11 +138,13 @@ export class S3FerryCore {
             config.abortIncompleteMultipartUploadDays ??
             DEFAULT_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS;
 
-          await ensureAbortIncompleteMultipartUploadRule({
-            s3Client: this.getS3Client(),
-            bucket: bucketName,
-            daysAfterInitiation: abortDays,
-          });
+          if (abortDays !== false) {
+            await ensureAbortIncompleteMultipartUploadRule({
+              s3Client: this.getS3Client(),
+              bucket: bucketName,
+              daysAfterInitiation: abortDays,
+            });
+          }
         } finally {
           bucketProgress.remove();
         }

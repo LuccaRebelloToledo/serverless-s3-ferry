@@ -80,12 +80,17 @@ async function isFileUnchanged(
   // Slow path: multipart ETags don't match simple MD5
   // Check content-md5 metadata stored during previous multipart upload
   if (remote.ETag?.includes('-')) {
-    const head = await s3Client.send(
-      new HeadObjectCommand({ Bucket: bucket, Key: s3Key }),
-    );
-    const storedMD5 = head.Metadata?.[S3_CONTENT_MD5_METADATA_KEY];
-    if (storedMD5 && localMD5 === storedMD5) {
-      return true;
+    try {
+      const head = await s3Client.send(
+        new HeadObjectCommand({ Bucket: bucket, Key: s3Key }),
+      );
+      const storedMD5 = head.Metadata?.[S3_CONTENT_MD5_METADATA_KEY];
+      if (storedMD5 && localMD5 === storedMD5) {
+        return true;
+      }
+    } catch {
+      // HeadObject failed (permissions, network) — fall back to re-uploading
+      return false;
     }
   }
 
@@ -236,6 +241,7 @@ export async function uploadDirectory(
             : await fh.readFile();
 
           const putParams: PutObjectCommandInput = {
+            ...entry.s3Params,
             Bucket: bucket,
             Key: entry.s3Key,
             Body: body,
@@ -244,7 +250,6 @@ export async function uploadDirectory(
             Metadata: {
               [S3_CONTENT_MD5_METADATA_KEY]: localMD5,
             },
-            ...entry.s3Params,
             ...(isLargeFile && { ContentLength: stat.size }),
           };
 

@@ -34,6 +34,11 @@ export function parseBucketConfig(raw: RawBucketConfig): BucketSyncConfig {
   }
 
   if (raw.partSize != null) {
+    if (!Number.isInteger(raw.partSize)) {
+      throw new ConfigValidationError(
+        'Invalid custom.s3Ferry: partSize must be an integer',
+      );
+    }
     if (raw.partSize < MIN_PART_SIZE) {
       throw new ConfigValidationError(
         `Invalid custom.s3Ferry: partSize must be at least ${MIN_PART_SIZE} bytes (5 MiB)`,
@@ -46,26 +51,49 @@ export function parseBucketConfig(raw: RawBucketConfig): BucketSyncConfig {
     }
   }
 
-  if (raw.queueSize != null && raw.queueSize < MIN_QUEUE_SIZE) {
-    throw new ConfigValidationError(
-      `Invalid custom.s3Ferry: queueSize must be at least ${MIN_QUEUE_SIZE}`,
-    );
+  if (raw.queueSize != null) {
+    if (!Number.isInteger(raw.queueSize)) {
+      throw new ConfigValidationError(
+        'Invalid custom.s3Ferry: queueSize must be an integer',
+      );
+    }
+    if (raw.queueSize < MIN_QUEUE_SIZE) {
+      throw new ConfigValidationError(
+        `Invalid custom.s3Ferry: queueSize must be at least ${MIN_QUEUE_SIZE}`,
+      );
+    }
   }
 
-  if (raw.multipartThreshold != null && raw.multipartThreshold < 0) {
-    throw new ConfigValidationError(
-      'Invalid custom.s3Ferry: multipartThreshold must not be negative',
-    );
+  if (raw.multipartThreshold != null) {
+    if (!Number.isInteger(raw.multipartThreshold)) {
+      throw new ConfigValidationError(
+        'Invalid custom.s3Ferry: multipartThreshold must be an integer',
+      );
+    }
+    if (raw.multipartThreshold < 0) {
+      throw new ConfigValidationError(
+        'Invalid custom.s3Ferry: multipartThreshold must not be negative',
+      );
+    }
   }
 
   if (
     raw.abortIncompleteMultipartUploadDays != null &&
-    raw.abortIncompleteMultipartUploadDays <
-      MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS
+    raw.abortIncompleteMultipartUploadDays !== false
   ) {
-    throw new ConfigValidationError(
-      `Invalid custom.s3Ferry: abortIncompleteMultipartUploadDays must be at least ${MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS}`,
-    );
+    if (!Number.isInteger(raw.abortIncompleteMultipartUploadDays)) {
+      throw new ConfigValidationError(
+        'Invalid custom.s3Ferry: abortIncompleteMultipartUploadDays must be an integer or false to disable',
+      );
+    }
+    if (
+      raw.abortIncompleteMultipartUploadDays <
+      MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS
+    ) {
+      throw new ConfigValidationError(
+        `Invalid custom.s3Ferry: abortIncompleteMultipartUploadDays must be at least ${MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS} or false to disable`,
+      );
+    }
   }
 
   return {

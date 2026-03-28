@@ -711,4 +711,142 @@ describe('uploadDirectory', () => {
     expect(s3Mock.commandCalls(HeadObjectCommand)).toHaveLength(1);
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
   });
+
+  it('re-uploads when HeadObject fails for multipart ETag', async () => {
+    const content = 'some content';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: 'file.txt', ETag: '"abc123-2"' }],
+    });
+    s3Mock.on(HeadObjectCommand).rejects(new Error('AccessDenied'));
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+  });
+
+  it('re-uploads when HeadObject returns no Metadata', async () => {
+    const content = 'some content';
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), content);
+
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: 'file.txt', ETag: '"abc123-2"' }],
+    });
+    s3Mock.on(HeadObjectCommand).resolves({
+      Metadata: undefined,
+    });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+  });
+
+  it('uploads empty file (0 bytes) correctly', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'empty.txt'), '');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Key).toBe('empty.txt');
+  });
+
+  it('multipartThreshold 0 forces streaming path for small file', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'tiny.txt'), 'hello');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      multipartThreshold: 0,
+      partSize: 5 * 1024 * 1024,
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    // Upload class uses PutObjectCommand for files < partSize even with streaming body
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    // ContentLength is set when streaming path is used (threshold: 0 forces it)
+    expect(putCall.args[0].input.ContentLength).toBe(5);
+  });
+
+  it('s3Params cannot override critical fields like Bucket or Key', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+
+    s3Mock.on(ListObjectsV2Command).resolves({ Contents: [] });
+    s3Mock.on(PutObjectCommand).resolves({});
+
+    const client = new S3Client({});
+    await uploadDirectory({
+      s3Client: client,
+      localDir: tmpDir,
+      bucket: TEST_BUCKET,
+      prefix: '',
+      acl: 'private',
+      deleteRemoved: false,
+      params: [
+        {
+          glob: '*.txt',
+          params: { Bucket: 'malicious-bucket', Key: 'malicious-key' },
+        },
+      ],
+      progress: mockProgress(),
+      servicePath: tmpDir,
+    });
+
+    const putCalls = s3Mock.commandCalls(PutObjectCommand);
+    expect(putCalls).toHaveLength(1);
+    const putCall = putCalls[0];
+    if (!putCall) throw new Error('Expected PutObjectCommand call');
+    expect(putCall.args[0].input.Bucket).toBe(TEST_BUCKET);
+    expect(putCall.args[0].input.Key).toBe('file.txt');
+  });
 });

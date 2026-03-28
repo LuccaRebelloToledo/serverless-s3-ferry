@@ -178,6 +178,55 @@ describe('parseBucketConfig', () => {
     });
     expect(result.abortIncompleteMultipartUploadDays).toBe(1);
   });
+
+  it('accepts abortIncompleteMultipartUploadDays: false to disable lifecycle rule', () => {
+    const result = parseBucketConfig({
+      bucketName: 'bucket',
+      localDir: '.',
+      abortIncompleteMultipartUploadDays: false,
+    });
+    expect(result.abortIncompleteMultipartUploadDays).toBe(false);
+  });
+
+  it('throws ConfigValidationError when partSize is not an integer', () => {
+    expect(() =>
+      parseBucketConfig({
+        bucketName: 'bucket',
+        localDir: '.',
+        partSize: 5242880.5,
+      }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('throws ConfigValidationError when queueSize is not an integer', () => {
+    expect(() =>
+      parseBucketConfig({
+        bucketName: 'bucket',
+        localDir: '.',
+        queueSize: 1.7,
+      }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('throws ConfigValidationError when multipartThreshold is not an integer', () => {
+    expect(() =>
+      parseBucketConfig({
+        bucketName: 'bucket',
+        localDir: '.',
+        multipartThreshold: 100.5,
+      }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('throws ConfigValidationError when abortIncompleteMultipartUploadDays is not an integer', () => {
+    expect(() =>
+      parseBucketConfig({
+        bucketName: 'bucket',
+        localDir: '.',
+        abortIncompleteMultipartUploadDays: 3.5,
+      }),
+    ).toThrow(ConfigValidationError);
+  });
 });
 
 describe('extractMetaParams', () => {
