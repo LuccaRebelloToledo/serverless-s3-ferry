@@ -45,10 +45,10 @@ interface FileProcessEntry {
   s3Params: S3Params;
 }
 
-function computeFileMD5(filePath: string): Promise<string> {
+function computeFileMD5(fh: fs.promises.FileHandle): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('md5');
-    const stream = fs.createReadStream(filePath);
+    const stream = fh.createReadStream({ start: 0, autoClose: false });
     stream.on('data', (chunk) => hash.update(chunk));
     stream.on('end', () => resolve(`"${hash.digest('hex')}"`));
     stream.on('error', reject);
@@ -202,60 +202,67 @@ export async function uploadDirectory(
   await Promise.all(
     filesToProcess.map((entry) =>
       limit(async () => {
-        const localMD5 = await computeFileMD5(entry.localPath);
+        // Open file descriptor once to avoid TOCTOU race conditions
+        // All operations (stat, MD5, upload body) use the same fd
+        const fh = await fs.promises.open(entry.localPath, 'r');
+        try {
+          const stat = await fh.stat();
+          const localMD5 = await computeFileMD5(fh);
 
-        // Check if file has changed (supports both single-part and multipart ETags)
-        const remote = remoteByKey.get(entry.s3Key);
-        const unchanged = await isFileUnchanged({
-          s3Client,
-          bucket,
-          s3Key: entry.s3Key,
-          localMD5,
-          remote,
-        });
-        if (unchanged) {
+          // Check if file has changed (supports both single-part and multipart ETags)
+          const remote = remoteByKey.get(entry.s3Key);
+          const unchanged = await isFileUnchanged({
+            s3Client,
+            bucket,
+            s3Key: entry.s3Key,
+            localMD5,
+            remote,
+          });
+          if (unchanged) {
+            completedOperations++;
+            tracker.update(completedOperations, totalOperations);
+            return;
+          }
+
+          const contentType =
+            mime.getType(entry.localPath) ??
+            defaultContentType ??
+            DEFAULT_CONTENT_TYPE;
+
+          // Stream large files to avoid holding full buffer in memory during upload
+          const isLargeFile = stat.size > multipartThreshold;
+          const body: Buffer | fs.ReadStream = isLargeFile
+            ? fh.createReadStream({ start: 0, autoClose: false })
+            : await fh.readFile();
+
+          const putParams: PutObjectCommandInput = {
+            Bucket: bucket,
+            Key: entry.s3Key,
+            Body: body,
+            ACL: acl,
+            ContentType: contentType,
+            Metadata: {
+              [S3_CONTENT_MD5_METADATA_KEY]: localMD5,
+            },
+            ...entry.s3Params,
+            ...(isLargeFile && { ContentLength: stat.size }),
+          };
+
+          const upload = new Upload({
+            client: s3Client,
+            params: putParams,
+            queueSize,
+            partSize,
+            leavePartsOnError: false,
+          });
+
+          await upload.done();
+
           completedOperations++;
           tracker.update(completedOperations, totalOperations);
-          return;
+        } finally {
+          await fh.close();
         }
-
-        const contentType =
-          mime.getType(entry.localPath) ??
-          defaultContentType ??
-          DEFAULT_CONTENT_TYPE;
-
-        const stat = await fs.promises.stat(entry.localPath);
-
-        // Stream large files to avoid holding full buffer in memory during upload
-        const body: Buffer | fs.ReadStream =
-          stat.size > multipartThreshold
-            ? fs.createReadStream(entry.localPath)
-            : await fs.promises.readFile(entry.localPath);
-
-        const putParams: PutObjectCommandInput = {
-          Bucket: bucket,
-          Key: entry.s3Key,
-          Body: body,
-          ACL: acl,
-          ContentType: contentType,
-          Metadata: {
-            [S3_CONTENT_MD5_METADATA_KEY]: localMD5,
-          },
-          ...entry.s3Params,
-        };
-
-        const upload = new Upload({
-          client: s3Client,
-          params: putParams,
-          queueSize,
-          partSize,
-          leavePartsOnError: false,
-        });
-
-        await upload.done();
-
-        completedOperations++;
-        tracker.update(completedOperations, totalOperations);
       }),
     ),
   );
