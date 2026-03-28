@@ -4,6 +4,5 @@ export * from './delete';
 export * from './lifecycle';
 export * from './list';
 export * from './metadata';
-export * from './send-or-default';
 export * from './tags';
 export * from './upload';

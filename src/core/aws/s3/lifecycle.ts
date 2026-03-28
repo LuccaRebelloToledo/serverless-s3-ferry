@@ -8,8 +8,8 @@ import {
 import {
   S3_FERRY_LIFECYCLE_RULE_ID,
   S3_NO_SUCH_LIFECYCLE_CONFIGURATION,
+  sendWithExpectedError,
 } from '@shared';
-import { sendWithExpectedError } from './send-or-default';
 
 interface EnsureAbortIncompleteMultipartUploadRuleOptions {
   s3Client: S3Client;

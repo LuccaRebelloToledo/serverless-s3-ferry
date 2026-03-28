@@ -3,8 +3,7 @@ import {
   PutBucketTaggingCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import { S3_NO_SUCH_TAG_SET, type Tag } from '@shared';
-import { sendWithExpectedError } from './send-or-default';
+import { S3_NO_SUCH_TAG_SET, sendWithExpectedError, type Tag } from '@shared';
 
 interface MergeTagsOptions {
   existingTagSet: Tag[];
