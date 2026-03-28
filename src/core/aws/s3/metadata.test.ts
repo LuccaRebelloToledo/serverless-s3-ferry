@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CopyObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import type { ParamEntry } from '@shared';
 import { createTestS3Client, mockProgress, TEST_BUCKET } from '@shared/testing';
 import { mockClient } from 'aws-sdk-client-mock';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -627,7 +628,7 @@ describe('syncDirectoryMetadata', () => {
       );
     });
 
-    it('reports 0% for empty directory', async () => {
+    it('does not report progress for empty directory', async () => {
       s3Mock.on(CopyObjectCommand).resolves({});
 
       const client = createTestS3Client();
@@ -642,13 +643,31 @@ describe('syncDirectoryMetadata', () => {
         progress: mockProgressLogger,
       });
 
-      expect(mockProgressLogger.update).toHaveBeenCalledWith(
-        expect.stringContaining('0%'),
-      );
+      expect(mockProgressLogger.update).not.toHaveBeenCalled();
     });
   });
 
   describe('edge cases', () => {
+    it('skips param entries with no glob key', async () => {
+      fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'data');
+
+      s3Mock.on(CopyObjectCommand).resolves({});
+
+      const client = createTestS3Client();
+      await syncDirectoryMetadata({
+        s3Client: client,
+        localDir: tmpDir,
+        bucket: TEST_BUCKET,
+        bucketPrefix: '',
+        acl: 'private',
+        params: [{} as ParamEntry],
+        progress: mockProgress(),
+      });
+
+      const calls = s3Mock.commandCalls(CopyObjectCommand);
+      expect(calls).toHaveLength(0);
+    });
+
     it('handles empty directory', async () => {
       s3Mock.on(CopyObjectCommand).resolves({});
 

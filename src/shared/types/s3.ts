@@ -2,12 +2,6 @@ import type { ObjectCannedACL } from '@aws-sdk/client-s3';
 
 export type S3Params = Record<string, string>;
 
-export interface FileUploadEntry {
-  localPath: string;
-  s3Key: string;
-  s3Params: S3Params;
-}
-
 export interface S3Object {
   Key: string;
   ETag?: string;

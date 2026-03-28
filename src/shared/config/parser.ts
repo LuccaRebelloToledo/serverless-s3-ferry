@@ -159,7 +159,7 @@ export function getEndpoint(
   if (Array.isArray(rawConfig)) {
     return null;
   }
-  return (rawConfig.endpoint as string) ?? null;
+  return typeof rawConfig.endpoint === 'string' ? rawConfig.endpoint : null;
 }
 
 export function getCustomHooks(
@@ -168,5 +168,5 @@ export function getCustomHooks(
   if (Array.isArray(rawConfig)) {
     return [];
   }
-  return (rawConfig.hooks as string[]) ?? [];
+  return Array.isArray(rawConfig.hooks) ? rawConfig.hooks : [];
 }

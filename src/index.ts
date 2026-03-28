@@ -102,14 +102,8 @@ class ServerlessS3Ferry implements Plugin {
       optionNoSync: options.nos3ferry,
     });
     const customHooks = getCustomHooks(rawConfig);
-    const customHookEntries = customHooks.reduce(
-      (acc: Record<string, () => Promise<void>>, hook: string) => {
-        acc[hook] = async () => {
-          await this.core.performFullSync();
-        };
-        return acc;
-      },
-      {},
+    const customHookEntries = Object.fromEntries(
+      customHooks.map((hook) => [hook, () => this.core.performFullSync()]),
     );
 
     this.hooks = {

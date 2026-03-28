@@ -51,7 +51,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -81,7 +80,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -106,7 +104,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
@@ -128,7 +125,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: true,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
@@ -154,7 +150,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(DeleteObjectsCommand)).toHaveLength(0);
@@ -175,7 +170,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -210,7 +204,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: true,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     // Should have listed twice
@@ -246,7 +239,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: true,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
@@ -281,7 +273,6 @@ describe('uploadDirectory', () => {
       ],
       stage: 'prod',
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -314,7 +305,6 @@ describe('uploadDirectory', () => {
       params: [{ glob: '*.html', params: { OnlyForStage: 'prod' } }],
       stage: 'dev',
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
@@ -337,7 +327,6 @@ describe('uploadDirectory', () => {
       params: [{ glob: '*.html', params: { OnlyForStage: 'prod' } }],
       stage: undefined,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
@@ -359,7 +348,6 @@ describe('uploadDirectory', () => {
       deleteRemoved: false,
       defaultContentType: 'text/plain',
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -383,7 +371,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -414,7 +401,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: true,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const deleteCalls = s3Mock.commandCalls(DeleteObjectsCommand);
@@ -443,7 +429,6 @@ describe('uploadDirectory', () => {
       deleteRemoved: false,
       params: [{ glob: '*.html', params: { CacheControl: 'max-age=300' } }],
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -469,7 +454,6 @@ describe('uploadDirectory', () => {
       deleteRemoved: false,
       params: [{ glob: '*.html', params: { CacheControl: 'max-age=300' } }],
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -500,7 +484,6 @@ describe('uploadDirectory', () => {
       ],
       stage: 'prod',
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -526,7 +509,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -560,7 +542,6 @@ describe('uploadDirectory', () => {
       multipartThreshold: 5 * 1024 * 1024,
       partSize: 5 * 1024 * 1024,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(0);
@@ -589,7 +570,6 @@ describe('uploadDirectory', () => {
       deleteRemoved: false,
       multipartThreshold: 5 * 1024 * 1024,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
@@ -617,7 +597,6 @@ describe('uploadDirectory', () => {
       partSize: 5 * 1024 * 1024,
       queueSize: 1,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     // 11MB file with 5MB parts = 3 parts (5 + 5 + 1)
@@ -645,7 +624,6 @@ describe('uploadDirectory', () => {
         multipartThreshold: 5 * 1024 * 1024,
         partSize: 5 * 1024 * 1024,
         progress: mockProgress(),
-        servicePath: tmpDir,
       }),
     ).rejects.toThrow();
 
@@ -676,7 +654,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(HeadObjectCommand)).toHaveLength(1);
@@ -705,7 +682,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(HeadObjectCommand)).toHaveLength(1);
@@ -731,7 +707,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
@@ -758,7 +733,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
@@ -779,7 +753,6 @@ describe('uploadDirectory', () => {
       acl: 'private',
       deleteRemoved: false,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -806,7 +779,6 @@ describe('uploadDirectory', () => {
       multipartThreshold: 0,
       partSize: 5 * 1024 * 1024,
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     // Upload class uses PutObjectCommand for files < partSize even with streaming body
@@ -839,7 +811,6 @@ describe('uploadDirectory', () => {
         },
       ],
       progress: mockProgress(),
-      servicePath: tmpDir,
     });
 
     const putCalls = s3Mock.commandCalls(PutObjectCommand);
@@ -881,7 +852,6 @@ describe('uploadDirectory', () => {
         acl: 'private',
         deleteRemoved: false,
         progress: mockProgress(),
-        servicePath: tmpDir,
       }),
     ).rejects.toThrow('exceeds the maximum S3 object size');
 
@@ -920,7 +890,6 @@ describe('uploadDirectory', () => {
         deleteRemoved: false,
         partSize: 5 * 1024 * 1024,
         progress: mockProgress(),
-        servicePath: tmpDir,
       }),
     ).rejects.toThrow('exceeding the S3 limit of 10000 parts');
 
