@@ -62,7 +62,7 @@ plugins:
 
 | serverless-s3-ferry | Serverless Framework | Node.js    |
 | ------------------- | -------------------- | ---------- |
-| >= v1.0.0           | v4.x                 | >= 18.0.0  |
+| >= v1.0.0           | v4.x                 | >= 22.0.0  |
 
 ## Configuration
 
