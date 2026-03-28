@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
     /* Language and Environment */
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ES2023",
+    "lib": ["ES2023"],
 
     /* Modules */
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "nodenext",
     "moduleDetection": "force",
     "resolveJsonModule": true,
     "esModuleInterop": true,
@@ -36,8 +35,6 @@
 
     /* Type Checking - Strict */
     "strict": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitOverride": true,
 
@@ -52,6 +49,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
+
+    /* TypeScript 5.8+ */
+    "erasableSyntaxOnly": true,
+    "libReplacement": false,
 
     /* Completeness */
     "skipLibCheck": true
