@@ -2,6 +2,10 @@ import { ObjectCannedACL } from '@aws-sdk/client-s3';
 import {
   type BucketSyncConfig,
   ConfigValidationError,
+  MAX_PART_SIZE,
+  MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS,
+  MIN_PART_SIZE,
+  MIN_QUEUE_SIZE,
   type ParamEntry,
   type ParamMatcher,
   type RawBucketConfig,
@@ -29,6 +33,41 @@ export function parseBucketConfig(raw: RawBucketConfig): BucketSyncConfig {
     );
   }
 
+  if (raw.partSize != null) {
+    if (raw.partSize < MIN_PART_SIZE) {
+      throw new ConfigValidationError(
+        `Invalid custom.s3Ferry: partSize must be at least ${MIN_PART_SIZE} bytes (5 MiB)`,
+      );
+    }
+    if (raw.partSize > MAX_PART_SIZE) {
+      throw new ConfigValidationError(
+        `Invalid custom.s3Ferry: partSize must not exceed ${MAX_PART_SIZE} bytes (5 GiB)`,
+      );
+    }
+  }
+
+  if (raw.queueSize != null && raw.queueSize < MIN_QUEUE_SIZE) {
+    throw new ConfigValidationError(
+      `Invalid custom.s3Ferry: queueSize must be at least ${MIN_QUEUE_SIZE}`,
+    );
+  }
+
+  if (raw.multipartThreshold != null && raw.multipartThreshold < 0) {
+    throw new ConfigValidationError(
+      'Invalid custom.s3Ferry: multipartThreshold must not be negative',
+    );
+  }
+
+  if (
+    raw.abortIncompleteMultipartUploadDays != null &&
+    raw.abortIncompleteMultipartUploadDays <
+      MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS
+  ) {
+    throw new ConfigValidationError(
+      `Invalid custom.s3Ferry: abortIncompleteMultipartUploadDays must be at least ${MIN_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS}`,
+    );
+  }
+
   return {
     bucketName: raw.bucketName,
     bucketNameKey: raw.bucketNameKey,
@@ -41,6 +80,10 @@ export function parseBucketConfig(raw: RawBucketConfig): BucketSyncConfig {
     preCommand: raw.preCommand,
     params: raw.params ?? [],
     bucketTags: raw.bucketTags,
+    multipartThreshold: raw.multipartThreshold,
+    partSize: raw.partSize,
+    queueSize: raw.queueSize,
+    abortIncompleteMultipartUploadDays: raw.abortIncompleteMultipartUploadDays,
   };
 }
 

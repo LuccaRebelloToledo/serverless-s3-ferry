@@ -6,6 +6,7 @@ import { resolveStackOutput } from '@core/aws/cloudformation';
 import {
   createS3Client,
   deleteDirectory,
+  ensureAbortIncompleteMultipartUploadRule,
   syncDirectoryMetadata,
   updateBucketTags,
   uploadDirectory,
@@ -15,6 +16,7 @@ import {
   type BucketSyncConfig,
   buildParamMatchers,
   ConfigValidationError,
+  DEFAULT_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS,
   DEFAULT_MAX_CONCURRENCY,
   getBucketConfigs,
   getEndpoint,
@@ -123,10 +125,23 @@ export class S3FerryCore {
             defaultContentType: config.defaultContentType,
             params: paramMatchers,
             maxConcurrency: DEFAULT_MAX_CONCURRENCY,
+            multipartThreshold: config.multipartThreshold,
+            partSize: config.partSize,
+            queueSize: config.queueSize,
             progress: bucketProgress,
             servicePath: this.servicePath,
             stage: this.stage,
             log: this.log,
+          });
+
+          const abortDays =
+            config.abortIncompleteMultipartUploadDays ??
+            DEFAULT_ABORT_INCOMPLETE_MULTIPART_UPLOAD_DAYS;
+
+          await ensureAbortIncompleteMultipartUploadRule({
+            s3Client: this.getS3Client(),
+            bucket: bucketName,
+            daysAfterInitiation: abortDays,
           });
         } finally {
           bucketProgress.remove();

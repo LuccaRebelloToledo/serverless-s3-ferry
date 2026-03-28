@@ -22,13 +22,14 @@ This implementation does not reuse any code from the original project.
 ## Features
 
 - Sync local directories to S3 buckets on deploy and remove
+- **High Performance**: Concurrent uploads and multipart support for large files (> 5GB)
+- **Resilient**: Built-in adaptive retry strategy for handling throttling and network issues
 - Per-file cache control and content type configuration via glob patterns
 - Bucket tagging support (appends to existing tags)
 - Resolve bucket names from CloudFormation stack outputs
 - Conditional sync rules with the `enabled` flag
 - Offline development support with `serverless-offline` and `serverless-s3-local`
 - Custom lifecycle hook integration
-- Concurrent uploads with configurable parallelism
 
 ## Table of Contents
 
@@ -36,6 +37,7 @@ This implementation does not reuse any code from the original project.
 - [Compatibility](#compatibility)
 - [Configuration](#configuration)
 - [Configuration Reference](#configuration-reference)
+- [IAM Permissions](#iam-permissions)
 - [Usage](#usage)
 - [Offline Usage](#offline-usage)
 - [Advanced Configuration](#advanced-configuration)
@@ -137,10 +139,14 @@ resources:
 | `deleteRemoved` | boolean | `true` | Delete S3 objects absent from `localDir` |
 | `acl` | string | `'private'` | S3 object ACL |
 | `defaultContentType` | string | — | Fallback MIME type |
-| `params` | array | — | Per-file S3 params via glob patterns |
+| `params` | array | `[]` | Per-file S3 params via glob patterns |
 | `bucketTags` | object | — | Tags to merge into the bucket |
 | `enabled` | boolean | `true` | Disable this sync rule when `false` |
 | `preCommand` | string | — | Shell command to run before sync |
+| `multipartThreshold` | number | `104857600` | File size in bytes above which streaming multipart upload is used (100 MB). Set to `0` to always use multipart. Must be >= 0 |
+| `partSize` | number | `16777216` | Size of each part in bytes for multipart upload (16 MB). Min: 5 MiB, Max: 5 GiB |
+| `queueSize` | number | `4` | Number of concurrent part uploads per file. Min: 1 |
+| `abortIncompleteMultipartUploadDays` | number | `7` | Days after which incomplete multipart uploads are automatically aborted via S3 lifecycle rule. Min: 1 |
 
 ### Global options
 
@@ -152,6 +158,22 @@ These are set directly on the `s3Ferry` object (instead of using the array short
 | `noSync` | boolean | `false` | Disable auto-sync on deploy/remove |
 | `hooks` | string[] | — | Additional lifecycle hooks to trigger sync |
 | `buckets` | array | — | Bucket config list (required when using global options) |
+
+## IAM Permissions
+
+To use this plugin, your AWS credentials must have the following permissions:
+
+### S3 Permissions
+- `s3:PutObject` (also covers multipart upload operations: create, upload part, complete)
+- `s3:GetObject`
+- `s3:ListBucket`
+- `s3:DeleteObject` (if `deleteRemoved` is true)
+- `s3:AbortMultipartUpload` (for cleanup of failed multipart uploads)
+- `s3:GetLifecycleConfiguration` and `s3:PutLifecycleConfiguration` (for configuring automatic abort of incomplete multipart uploads)
+- `s3:GetBucketTagging` and `s3:PutBucketTagging` (if `bucketTags` is used)
+
+### CloudFormation Permissions (optional)
+- `cloudformation:DescribeStacks` (required only if using `bucketNameKey`)
 
 ## Usage
 
@@ -165,14 +187,30 @@ Run `sls remove --nos3ferry` -- remove the stack without deleting S3 objects.
 
 ### `sls s3ferry`
 
-Sync local directories and S3 prefixes on demand.
+Sync everything (files, metadata, and tags) on demand.
+
+### `sls s3ferry:sync`
+Sync files only.
+
+### `sls s3ferry:metadata`
+Sync metadata only (ACL, Cache-Control, etc.).
+
+### `sls s3ferry:tags`
+Sync bucket tags only.
 
 ### `sls s3ferry bucket`
 
-Sync a specific bucket only.
+Sync everything for a specific bucket only.
 
 ```sh
 sls s3ferry bucket -b my-static-site-assets
+```
+
+You can also append `:sync`, `:metadata` or `:tags` to the bucket command:
+
+```sh
+# Sync only metadata for a specific bucket
+sls s3ferry bucket:metadata -b my-static-site-assets
 ```
 
 ## Offline Usage
@@ -231,17 +269,59 @@ custom:
 # ...
 ```
 
-### Stage-scoped file params
+### Multipart uploads
 
-Use the `OnlyForStage` param to upload a file only when a specific stage is active:
+Files larger than `multipartThreshold` (default 100 MB) are automatically uploaded using S3 multipart upload via `@aws-sdk/lib-storage`. This enables:
+
+- Uploading files larger than 5 GB (S3's single-part limit)
+- Memory-efficient streaming for large files
+- Concurrent part uploads for improved throughput
+- Automatic cleanup of incomplete uploads on failure (`leavePartsOnError: false`)
+- S3 lifecycle rule to abort incomplete multipart uploads after a configurable number of days (default: 7)
 
 ```yaml
-# Only upload this file when --stage production
+custom:
+  s3Ferry:
+    - bucketName: my-bucket
+      localDir: dist/
+      multipartThreshold: 104857600 # 100 MB - use multipart for files above this size
+      partSize: 67108864 # 64 MB per part (recommended for files > 1 GB)
+      queueSize: 4 # concurrent part uploads per file
+      abortIncompleteMultipartUploadDays: 7 # cleanup orphaned uploads after 7 days
+```
+
+The defaults (100 MB threshold, 16 MB part size) follow [AWS best practices](https://repost.aws/knowledge-center/s3-upload-large-files). Increase `partSize` to 64 MB for very large files (> 1 GB) to reduce the number of parts, or increase `queueSize` on high-bandwidth connections.
+
+Setting `multipartThreshold: 0` forces all files to use streaming multipart upload regardless of size.
+
+#### S3 multipart upload limits
+
+These limits are [enforced by Amazon S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html) and validated by the plugin at configuration time:
+
+| Limit | Value |
+|-------|-------|
+| Minimum part size | 5 MiB (except the last part) |
+| Maximum part size | 5 GiB |
+| Maximum parts per upload | 10,000 |
+| Maximum object size | ~48.8 TiB (10,000 parts x 5 GiB) |
+
+### Stage-scoped file params
+
+Use the `OnlyForStage` param to upload a file only when a specific stage is active. This is useful for environment-specific configuration files:
+
+```yaml
+# Upload environment-specific files only to their respective stages
 params:
-  - "*.production.js":
+  - "config/settings.dev.json":
+      OnlyForStage: dev
+  - "config/settings.staging.json":
+      OnlyForStage: staging
+  - "config/settings.prod.json":
       CacheControl: 'max-age=31536000'
       OnlyForStage: production
 ```
+
+> **Note:** `OnlyForStage` is a special parameter handled by the plugin and is not sent to S3 as an object property.
 
 ## Contributing
 

@@ -23,6 +23,9 @@ export interface UploadDirOptions {
   defaultContentType?: string;
   params?: ParamMatcher[];
   maxConcurrency?: number;
+  multipartThreshold?: number;
+  partSize?: number;
+  queueSize?: number;
 }
 
 export interface ParamMatcher {

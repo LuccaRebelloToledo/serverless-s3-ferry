@@ -2,19 +2,24 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  PutObjectCommand,
+  HeadObjectCommand,
   type PutObjectCommandInput,
   type S3Client,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import {
   createProgressTracker,
   DEFAULT_CONTENT_TYPE,
   DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_MULTIPART_THRESHOLD,
+  DEFAULT_PART_SIZE,
+  DEFAULT_QUEUE_SIZE,
   type ErrorLogger,
   getLocalFiles,
   ONLY_FOR_STAGE_KEY,
   type ParamMatcher,
   type Plugin,
+  S3_CONTENT_MD5_METADATA_KEY,
   type S3Object,
   type S3Params,
   toS3Path,
@@ -40,8 +45,51 @@ interface FileProcessEntry {
   s3Params: S3Params;
 }
 
-function computeMD5(content: Buffer): string {
-  return `"${crypto.createHash('md5').update(content).digest('hex')}"`;
+function computeFileMD5(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('md5');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(`"${hash.digest('hex')}"`));
+    stream.on('error', reject);
+  });
+}
+
+interface IsFileUnchangedOptions {
+  s3Client: S3Client;
+  bucket: string;
+  s3Key: string;
+  localMD5: string;
+  remote?: S3Object;
+}
+
+async function isFileUnchanged(
+  options: IsFileUnchangedOptions,
+): Promise<boolean> {
+  const { s3Client, bucket, s3Key, localMD5, remote } = options;
+
+  if (!remote) {
+    return false;
+  }
+
+  // Fast path: ETag matches (works for single-part uploads)
+  if (remote.ETag && localMD5 === remote.ETag) {
+    return true;
+  }
+
+  // Slow path: multipart ETags don't match simple MD5
+  // Check content-md5 metadata stored during previous multipart upload
+  if (remote.ETag?.includes('-')) {
+    const head = await s3Client.send(
+      new HeadObjectCommand({ Bucket: bucket, Key: s3Key }),
+    );
+    const storedMD5 = head.Metadata?.[S3_CONTENT_MD5_METADATA_KEY];
+    if (storedMD5 && localMD5 === storedMD5) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 interface ResolveS3ParamsOptions {
@@ -91,6 +139,9 @@ export async function uploadDirectory(
     defaultContentType,
     params,
     maxConcurrency = DEFAULT_MAX_CONCURRENCY,
+    multipartThreshold = DEFAULT_MULTIPART_THRESHOLD,
+    partSize = DEFAULT_PART_SIZE,
+    queueSize = DEFAULT_QUEUE_SIZE,
     progress,
     stage,
     log,
@@ -146,21 +197,26 @@ export async function uploadDirectory(
       `${localDir}: sync with bucket ${bucket} (${percent}%)`,
   });
 
-  // Read, compare MD5, and upload in a single pass per file (inside pLimit)
-  // Only maxConcurrency file buffers are in memory at any given time
+  // Upload files with multipart support via @aws-sdk/lib-storage
   const limit = pLimit(maxConcurrency);
   await Promise.all(
     filesToProcess.map((entry) =>
       limit(async () => {
-        const buffer = await fs.promises.readFile(entry.localPath);
-        const localMD5 = computeMD5(buffer);
+        const localMD5 = await computeFileMD5(entry.localPath);
 
-        // Check if file has changed by comparing MD5 with ETag
+        // Check if file has changed (supports both single-part and multipart ETags)
         const remote = remoteByKey.get(entry.s3Key);
-        if (remote?.ETag && localMD5 === remote.ETag) {
+        const unchanged = await isFileUnchanged({
+          s3Client,
+          bucket,
+          s3Key: entry.s3Key,
+          localMD5,
+          remote,
+        });
+        if (unchanged) {
           completedOperations++;
           tracker.update(completedOperations, totalOperations);
-          return; // file unchanged
+          return;
         }
 
         const contentType =
@@ -168,16 +224,35 @@ export async function uploadDirectory(
           defaultContentType ??
           DEFAULT_CONTENT_TYPE;
 
+        const stat = await fs.promises.stat(entry.localPath);
+
+        // Stream large files to avoid holding full buffer in memory during upload
+        const body: Buffer | fs.ReadStream =
+          stat.size > multipartThreshold
+            ? fs.createReadStream(entry.localPath)
+            : await fs.promises.readFile(entry.localPath);
+
         const putParams: PutObjectCommandInput = {
           Bucket: bucket,
           Key: entry.s3Key,
-          Body: buffer,
+          Body: body,
           ACL: acl,
           ContentType: contentType,
+          Metadata: {
+            [S3_CONTENT_MD5_METADATA_KEY]: localMD5,
+          },
           ...entry.s3Params,
         };
 
-        await s3Client.send(new PutObjectCommand(putParams));
+        const upload = new Upload({
+          client: s3Client,
+          params: putParams,
+          queueSize,
+          partSize,
+          leavePartsOnError: false,
+        });
+
+        await upload.done();
 
         completedOperations++;
         tracker.update(completedOperations, totalOperations);
