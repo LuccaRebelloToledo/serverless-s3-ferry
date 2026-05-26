@@ -43,24 +43,24 @@
     "prepare": "husky || true"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "^3.1019.0",
-    "@aws-sdk/client-s3": "^3.1019.0",
-    "@aws-sdk/lib-storage": "^3.1019.0",
+    "@aws-sdk/client-cloudformation": "^3.1053.0",
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "@aws-sdk/lib-storage": "^3.1053.0",
     "mime": "^4.1.0",
-    "minimatch": "^10.2.4",
+    "minimatch": "^10.2.5",
     "p-limit": "^3.1.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.9",
+    "@biomejs/biome": "2.4.15",
     "@types/node": "^25.5.0",
     "@types/serverless": "^3.12.28",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.7",
     "aws-sdk-client-mock": "^4.1.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "tsc-alias": "^1.8.16",
+    "lint-staged": "^17.0.5",
+    "tsc-alias": "^1.8.17",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.7"
   },
   "publishConfig": {
     "access": "public"
