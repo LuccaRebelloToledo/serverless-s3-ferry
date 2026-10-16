@@ -4,8 +4,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
-      '@shared': path.resolve(__dirname, 'src/shared'),
-      '@core': path.resolve(__dirname, 'src/core'),
+      '@shared': path.resolve(import.meta.dirname, 'src/shared'),
+      '@core': path.resolve(import.meta.dirname, 'src/core'),
     },
   },
   test: {
@@ -14,7 +14,7 @@ export default defineConfig({
     coverage: {
       include: ['src/**/*.ts'],
       exclude: [
-        'src/shared/testing',
+        'src/shared/testing/**',
         'src/shared/index.ts',
         'src/shared/*/index.ts',
         'src/core/**/index.ts',
